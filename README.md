@@ -6,7 +6,7 @@
 - [Sahaj Patel](https://github.com/sah4jpatel)
 - [Matthew Clausen](https://github.com/matt-clausen)
 - [Tom Liraz](https://github.com/tomliraz)
-- [Tyler J. Schultz](https://github.com/matt-clausen)
+- [Tyler J. Schultz](https://github.com/tj-schultz)
 
 ## Before using
 
