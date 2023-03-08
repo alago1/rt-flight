@@ -21,7 +21,6 @@ class UnaryService(pb2_grpc.MavlinkServicer):
         pass
 
     def GetServerResponse(self, request, context):
-
         lat_center = 29.643946
         lon_center = -82.355659
 
@@ -33,13 +32,13 @@ class UnaryService(pb2_grpc.MavlinkServicer):
         lon_max = lon_center + (15 * lon_mile)
 
         lat, lon = generateCoords(lon_min, lon_max, lat_min, lat_max)
+        rad = random.uniform(0, 2000)
+        conf = random.uniform(0, 100)
 
-        message = request.message
-        result = f"{lat} {lon}"
+        result = f"{lat} {lon} {rad} {conf}"
         result = {"message": result, "received": True}
 
         return pb2.MessageResponse(**result)
-
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -47,6 +46,5 @@ def serve():
     server.add_insecure_port("[::]:50052")
     server.start()
     server.wait_for_termination()
-
 
 serve()
