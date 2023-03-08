@@ -60,20 +60,21 @@ table_view.pack()
 
 table = ttk.Treeview(table_view)
 
-table["columns"] = ("UUID", "lat", "long", "conf")
+table["columns"] = ("UUID", "lat", "long", "radius", "conf")
 
 table.column("#0", width=0, stretch=tk.YES)
 table.column("UUID", anchor=tk.CENTER, width=100)
 table.column("lat", anchor=tk.CENTER, width=150)
 table.column("long", anchor=tk.CENTER, width=150)
+table.column("radius", anchor=tk.CENTER, width=75)
 table.column("conf", anchor=tk.CENTER, width=100)
 
 table.heading("#0", text="", anchor=tk.CENTER)
 table.heading("UUID", text="UUID", anchor=tk.CENTER)
 table.heading("lat", text="lat", anchor=tk.CENTER)
 table.heading("long", text="long", anchor=tk.CENTER)
+table.heading("radius", text="radius", anchor=tk.CENTER)
 table.heading("conf", text="conf", anchor=tk.CENTER)
-
 
 table.pack()
 
@@ -87,20 +88,23 @@ def update_map():
     # fix protobuf file
 
     result = client.get_url(message="")
-    split_str = str(result).split()
-    lat = float(split_str[1][1:])
-    lon = float(split_str[2][:-1])
+    result = result.message
+    split_str = result.split()
+    lat = float(split_str[0])
+    lon = float(split_str[1])
+    rad = float(split_str[2])
+    conf = float(split_str[3])
 
     x, y = map_.to_pixels(lat, lon)
 
-    ax.scatter(x, y, s=1000, c="purple", alpha=0.5)
+    ax.scatter(x, y, s=rad, c="purple", alpha=0.5)
 
     table.insert(
         parent="",
         index="end",
         iid=uuid_count,
         text="",
-        values=(str(uuid_count), str(lat), str(lon), str(100)),
+        values=(str(uuid_count), str(lat), str(lon), str(rad), str(conf)),
     )
 
     uuid_count = uuid_count + 1
