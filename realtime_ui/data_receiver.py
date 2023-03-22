@@ -4,31 +4,21 @@ from tkinter import *
 from tkinter import ttk
 import grpc
 import os, sys
+import time
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "mavlink_sim"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
+import messaging_pb2
+import messaging_pb2_grpc
 
-import mavlink_pb2_grpc as pb2_grpc
-import mavlink_pb2 as pb2
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import random
+import numpy as np
+from sklearn.cluster import DBSCAN
 
 
-class UnaryClient(object):
-    def __init__(self):
-        self.host = "localhost"
-        self.server_port = 50052
-
-        self.channel = grpc.insecure_channel(f"{self.host}:{self.server_port}")
-        self.stub = pb2_grpc.MavlinkStub(self.channel)
-
-    def get_url(self, message):
-        message = pb2.Message(message=message)
-        print(f"{message}")
-        return self.stub.GetServerResponse(message)
-
-
-client = UnaryClient()
+channel = grpc.insecure_channel('localhost:50051')
+stub = messaging_pb2_grpc.MessagingServiceStub(channel)
 
 root = tk.Tk()
 root.geometry("800x1100")
@@ -84,34 +74,36 @@ uuid_count = 0
 def update_map():
     global uuid_count
     global client
+    global scatter
+    
+    table.delete(*table.get_children())
+    ax.clear()
+    ax.imshow(map_img, interpolation="lanczos", origin="upper")
 
-    # fix protobuf file
+    response = stub.RequestProcessedData(messaging_pb2.ProcessedDataRequest(request="Request data"))
 
-    result = client.get_url(message="")
-    result = result.message
-    split_str = result.split()
-    lat = float(split_str[0])
-    lon = float(split_str[1])
-    rad = float(split_str[2])
-    conf = float(split_str[3])
+    for uuid_count, data in enumerate(response.processed_data):
+        result = data
+        split_str = result.split()
+        lat = float(split_str[0])
+        lon = float(split_str[1])
+        rad = float(split_str[2])
+        conf = float(split_str[3])
 
-    x, y = map_.to_pixels(lat, lon)
+        x, y = map_.to_pixels(lat, lon)
+        ax.scatter(x, y, s=rad, c="purple", alpha=0.5)
 
-    ax.scatter(x, y, s=rad, c="purple", alpha=0.5)
-
-    table.insert(
-        parent="",
-        index="end",
-        iid=uuid_count,
-        text="",
-        values=(str(uuid_count), str(lat), str(lon), str(rad), str(conf)),
-    )
-
-    uuid_count = uuid_count + 1
+        table.insert(
+            parent="",
+            index="end",
+            iid=uuid_count,
+            text="",
+            values=(str(uuid_count), str(lat), str(lon), str(rad), str(conf)),
+        )
+    
     table.yview_moveto(1)
-
     canvas.draw()
-    root.after(2000, update_map)
+    root.after(6000, update_map)
 
 
 update_map()

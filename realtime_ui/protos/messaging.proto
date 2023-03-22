@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package messaging;
+
+service MessagingService {
+    rpc SendData (DataRequest) returns (DataResponse) {}
+    rpc RequestProcessedData (ProcessedDataRequest) returns (ProcessedDataResponse) {}
+}
+
+message DataRequest {
+    string data = 1;
+}
+
+message DataResponse {
+    string status = 1;
+}
+
+message ProcessedDataRequest {
+    string request = 1;
+}
+
+message ProcessedDataResponse {
+    repeated string processed_data = 1;
+}
