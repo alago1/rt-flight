@@ -20,7 +20,6 @@ class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
         if not self.buffer:
             return messaging_pb2.ProcessedDataResponse()
         processed_data = self.buffer
-        self.buffer = []
         return messaging_pb2.ProcessedDataResponse(processed_data=processed_data)
 
 
