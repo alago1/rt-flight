@@ -23,17 +23,29 @@ stub = messaging_pb2_grpc.MessagingServiceStub(channel)
 root = tk.Tk()
 root.geometry("800x1100")
 
-lat_center = 29.643946
-lon_center = -82.355659
+DATASET_TOP_LEFT_GPS = np.array((12.86308254761559, 77.5151947517078))
+DATASET_TOP_RIGHT_GPS = np.array((12.863010715187013, 77.52267023737696))
+DATASET_BOT_LEFT_GPS = np.array((12.859008245256549, 77.5151541499705))
+DATASET_BOT_RIGHT_GPS = np.array((12.858936436333265, 77.52262951527761))
+DATASET_CORNER_GPS_COORDS = np.array([DATASET_TOP_LEFT_GPS, DATASET_TOP_RIGHT_GPS, DATASET_BOT_LEFT_GPS, DATASET_BOT_RIGHT_GPS])
 
-lat_mile = 0.0144927536231884
-lon_mile = 0.0181818181818182
-lat_min = lat_center - (15 * lat_mile)
-lat_max = lat_center + (15 * lat_mile)
-lon_min = lon_center - (15 * lon_mile)
-lon_max = lon_center + (15 * lon_mile)
+# lat_center = 29.643946
+# lon_center = -82.355659
+lat_center = DATASET_CORNER_GPS_COORDS[:, 0].mean()
+lon_center = DATASET_CORNER_GPS_COORDS[:, 1].mean()
 
-map_ = smopy.Map((lat_min, lon_min, lat_max, lon_max), z=10)
+# lat_mile = 0.0144927536231884
+# lon_mile = 0.0181818181818182
+lat_min = DATASET_CORNER_GPS_COORDS[:, 0].min()
+lat_max = DATASET_CORNER_GPS_COORDS[:, 0].max()
+lon_min = DATASET_CORNER_GPS_COORDS[:, 1].min()
+lon_max = DATASET_CORNER_GPS_COORDS[:, 1].max()
+# lat_min = lat_center - (15 * lat_mile)
+# lat_max = lat_center + (15 * lat_mile)
+# lon_min = lon_center - (15 * lon_mile)
+# lon_max = lon_center + (15 * lon_mile)
+
+map_ = smopy.Map((lat_min, lon_min, lat_max, lon_max), z=16)
 map_img = map_.to_pil()
 
 fig = Figure(frameon=False)
@@ -70,36 +82,49 @@ table.pack()
 
 uuid_count = 0
 
+def process_response_data(data, eps=0.0005, min_samples=3):
+    if not data:
+        return [], []
+
+    # each sample is [latitude, longitude, radius, confidence]
+    samples = np.array([[float(x) for x in row.split()] for row in data])
+
+    # apply DBSCAN to find clusters
+    labels = DBSCAN(eps=eps, min_samples=min_samples).fit_predict(samples[:, :2])
+    return samples, labels
 
 def update_map():
     global uuid_count
-    global client
-    global scatter
     
     table.delete(*table.get_children())
     ax.clear()
     ax.imshow(map_img, interpolation="lanczos", origin="upper")
 
     response = stub.RequestProcessedData(messaging_pb2.ProcessedDataRequest(request="Request data"))
+    data, cluster_labels = process_response_data(response.processed_data)
 
-    for uuid_count, data in enumerate(response.processed_data):
-        result = data
-        split_str = result.split()
-        lat = float(split_str[0])
-        lon = float(split_str[1])
-        rad = float(split_str[2])
-        conf = float(split_str[3])
+    pixel_locations = []
+
+    for uuid_count, data_point in enumerate(data):
+        lat, lon, rad, conf = data_point
+
+        if not (lat_min <= lat <= lat_max and lon_min <= lon <= lon_max):
+            print(f"Point {lat}, {lon} is out of bounds. Won't be visible.")
 
         x, y = map_.to_pixels(lat, lon)
-        ax.scatter(x, y, s=rad, c="purple", alpha=0.5)
+        pixel_locations.append((x, y))
 
         table.insert(
             parent="",
             index="end",
             iid=uuid_count,
             text="",
-            values=(str(uuid_count), str(lat), str(lon), str(rad), str(conf)),
+            values=list(str(v) for v in (uuid_count, lat, lon, rad, conf)),
         )
+
+    pixel_locations = np.array(pixel_locations)
+    if len(pixel_locations) > 0:
+        ax.scatter(pixel_locations.T[0], pixel_locations.T[1], s=data[:, 2], c=cluster_labels, cmap="Spectral", alpha=0.2)
     
     table.yview_moveto(1)
     canvas.draw()
