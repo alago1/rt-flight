@@ -10,7 +10,6 @@ from PIL.ExifTags import TAGS
 from scipy.ndimage import rotate
 import cv2
 import json
-from exif import Image
 from math import radians, degrees, sin, cos, tan, atan2, sqrt, atan, asin
 import smopy
 from geopy import distance
@@ -34,8 +33,7 @@ class ObjectDetectionLayer:
         self.classes = ["car", "truck", "bus", "minibus", "cyclist"]
 
     def _load_model(self):
-        net = cv2.dnn.readNet(self.weights_file, self.config_file)
-        return net
+        return cv2.dnn.readNet(self.weights_file, self.config_file)
 
     def _get_output_layers(self, net):
         layer_names = net.getLayerNames()
@@ -50,6 +48,8 @@ class ObjectDetectionLayer:
 
     def _get_bboxes_pixels(self, img_path):
         img = Image.open(img_path)
+        img = np.array(img)
+        
         image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
         Height, Width = image.shape[:2]
@@ -104,7 +104,9 @@ class ObjectDetectionLayer:
         return np.array(bboxes_with_confidence).astype(int)
 
     def run(self, img_path):
+        print("Running model")
         bboxes_pixels = self._get_bboxes_pixels(img_path)
+        print("Done running")
 
         return ([], []) if len(bboxes_pixels) == 0 else bboxes_pixels
 
@@ -289,10 +291,7 @@ class GPSTranslocationLayer:
         return center, radius
 
 
-    def run(self, image_path, json_data, bboxes):
-        with open(image_path, 'rb') as src:
-            img = Image(src)        
-            
+    def run(self, image_path, json_data, bboxes): 
         self._get_data_from_json(json_data)
         self._get_corner_coordinates()
         out = None
@@ -305,10 +304,9 @@ class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
         self.buffer = []
 
     def GetBoundingBoxes(self, request, context):
-        print(request.path)
-        img = Image.open(request.path)
-        img.show()
+        print("here")
         bboxes_pixels = obj_layer.run(request.path)
+        print("there")
         print(bboxes_pixels)
         
         gps_translation_layer.run(request.path, request.jsondata, bboxes_pixels)
