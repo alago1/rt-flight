@@ -3,14 +3,14 @@ syntax = "proto3";
 package messaging;
 
 service MessagingService {
-    rpc GetBoundingBoxes (Filepath) returns (BBoxes) {}
+    rpc GetBoundingBoxes (File_Payload) returns (BBoxes) {}
 }
 
-message Filepath {
+message File_Payload {
     string path = 1;
+    string jsondata = 2;
 }
 
 message BBoxes {
     string jsondata = 1;
 }
-

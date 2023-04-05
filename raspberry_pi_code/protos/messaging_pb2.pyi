@@ -10,8 +10,10 @@ class BBoxes(_message.Message):
     jsondata: str
     def __init__(self, jsondata: _Optional[str] = ...) -> None: ...
 
-class Filepath(_message.Message):
-    __slots__ = ["path"]
+class File_Payload(_message.Message):
+    __slots__ = ["jsondata", "path"]
+    JSONDATA_FIELD_NUMBER: _ClassVar[int]
     PATH_FIELD_NUMBER: _ClassVar[int]
+    jsondata: str
     path: str
-    def __init__(self, path: _Optional[str] = ...) -> None: ...
+    def __init__(self, path: _Optional[str] = ..., jsondata: _Optional[str] = ...) -> None: ...

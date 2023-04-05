@@ -41,7 +41,7 @@ class ObjectDetectionLayer:
         layer_names = net.getLayerNames()
         try:
             output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
-        except:
+        except Exception:
             output_layers = [
                 layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()
             ]
@@ -104,12 +104,9 @@ class ObjectDetectionLayer:
         return np.array(bboxes_with_confidence).astype(int)
 
     def run(self, img_path):
-        bboxes_pixels, bboxes_gps_coords = self._get_bboxes_pixels(img_path)
+        bboxes_pixels = self._get_bboxes_pixels(img_path)
 
-        if len(bboxes_pixels) == 0:
-            return [], []
-
-        return bboxes_gps_coords, bboxes_pixels  # remove the pixels bboxes later
+        return ([], []) if len(bboxes_pixels) == 0 else bboxes_pixels
 
 class GPSTranslocationLayer:
     
@@ -138,7 +135,7 @@ class GPSTranslocationLayer:
     h_dist = None
     
     aspect_ratio = None
-    
+
     def _get_data_from_json(self, json_data):
         data = json.loads(json_data)
         
@@ -293,7 +290,7 @@ class GPSTranslocationLayer:
 
 
     def run(self, image_path, json_data, bboxes):
-        with open(img_path, 'rb') as src:
+        with open(image_path, 'rb') as src:
             img = Image(src)        
             
         self._get_data_from_json(json_data)
@@ -308,13 +305,20 @@ class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
         self.buffer = []
 
     def GetBoundingBoxes(self, request, context):
-        self.buffer.append(request.path)
-        bboxes_gps, bboxes_pixels = obj_layer.run(request.path)
         print(request.path)
+        img = Image.open(request.path)
+        img.show()
+        bboxes_pixels = obj_layer.run(request.path)
+        print(bboxes_pixels)
+        
+        gps_translation_layer.run(request.path, request.jsondata, bboxes_pixels)
+
+        self.buffer.append()
+
         return messaging_pb2.BBoxes(jsondata="Data received and added to buffer")
 
 def serve():
-    global obj_layer
+    global obj_layer, gps_translation_layer
     
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     weights_file = "weights/yolov3-aerial.weights"
@@ -324,6 +328,9 @@ def serve():
     obj_layer = ObjectDetectionLayer(
         config_file=config_file, weights_file=weights_file, classes_file=classes_file
     )
+    
+    gps_translation_layer = GPSTranslocationLayer()
+    
     messaging_pb2_grpc.add_MessagingServiceServicer_to_server(MessagingService(), server)
     server.add_insecure_port('[::]:50051')
     server.start()
