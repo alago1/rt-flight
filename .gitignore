@@ -4,3 +4,4 @@ examples/mmrotate
 examples/ssdd_tiny/
 examples/ssdd_tiny.zip
 __pycache__
+weights/

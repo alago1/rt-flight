@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package messaging;
+
+service MessagingService {
+    rpc GetBoundingBoxes (Filepath) returns (BBoxes) {}
+}
+
+message Filepath {
+    string path = 1;
+}
+
+message BBoxes {
+    string jsondata = 1;
+}
+
