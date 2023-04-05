@@ -26,8 +26,9 @@ def run():
     }
     json_data = json.dumps(data)
     
-    stub.GetBoundingBoxes(messaging_pb2.File_Payload(path=img_path,
+    out = stub.GetBoundingBoxes(messaging_pb2.File_Payload(path=img_path,
                                                      jsondata=json_data))
-
+   
+    print(out.jsondata)
 if __name__ == '__main__':
     run()

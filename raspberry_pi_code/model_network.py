@@ -104,9 +104,7 @@ class ObjectDetectionLayer:
         return np.array(bboxes_with_confidence).astype(int)
 
     def run(self, img_path):
-        print("Running model")
         bboxes_pixels = self._get_bboxes_pixels(img_path)
-        print("Done running")
 
         return ([], []) if len(bboxes_pixels) == 0 else bboxes_pixels
 
@@ -304,10 +302,12 @@ class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
         self.buffer = []
 
     def GetBoundingBoxes(self, request, context):
-        print("here")
         bboxes_pixels = obj_layer.run(request.path)
-        print("there")
         print(bboxes_pixels)
+        
+        
+        if bboxes_pixels == ([], []):
+            return messaging_pb2.BBoxes(jsondata="No objects detected")
         
         gps_translation_layer.run(request.path, request.jsondata, bboxes_pixels)
 
