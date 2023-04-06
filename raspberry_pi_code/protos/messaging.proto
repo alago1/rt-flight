@@ -8,9 +8,15 @@ service MessagingService {
 
 message File_Payload {
     string path = 1;
-    string jsondata = 2;
 }
 
 message BBoxes {
-    string jsondata = 1;
+    repeated BBox bboxes = 1;
+}
+
+message BBox {
+    double latitude = 1;
+    double longitude = 2;
+    double radius = 3;
+    float confidence = 4;
 }

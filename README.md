@@ -11,3 +11,6 @@
 ## Before using
 
 You may want to add a `/data` folder at the root with the appropriate images.
+
+## To compile grpc protobuf
+`cd raspberry_pi_code/protos && python -m grpc_tools.protoc -I../protos --python_out=. --pyi_out=. --grpc_python_out=. messaging.proto`

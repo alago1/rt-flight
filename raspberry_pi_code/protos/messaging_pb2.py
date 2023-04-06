@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fmessaging.proto\x12\tmessaging\".\n\x0c\x46ile_Payload\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x10\n\x08jsondata\x18\x02 \x01(\t\"\x1a\n\x06\x42\x42oxes\x12\x10\n\x08jsondata\x18\x01 \x01(\t2T\n\x10MessagingService\x12@\n\x10GetBoundingBoxes\x12\x17.messaging.File_Payload\x1a\x11.messaging.BBoxes\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fmessaging.proto\x12\tmessaging\"\x1c\n\x0c\x46ile_Payload\x12\x0c\n\x04path\x18\x01 \x01(\t\")\n\x06\x42\x42oxes\x12\x1f\n\x06\x62\x62oxes\x18\x01 \x03(\x0b\x32\x0f.messaging.BBox\"O\n\x04\x42\x42ox\x12\x10\n\x08latitude\x18\x01 \x01(\x01\x12\x11\n\tlongitude\x18\x02 \x01(\x01\x12\x0e\n\x06radius\x18\x03 \x01(\x01\x12\x12\n\nconfidence\x18\x04 \x01(\x02\x32T\n\x10MessagingService\x12@\n\x10GetBoundingBoxes\x12\x17.messaging.File_Payload\x1a\x11.messaging.BBoxes\"\x00\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'messaging_pb2', globals())
@@ -21,9 +21,11 @@ if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
   _FILE_PAYLOAD._serialized_start=30
-  _FILE_PAYLOAD._serialized_end=76
-  _BBOXES._serialized_start=78
-  _BBOXES._serialized_end=104
-  _MESSAGINGSERVICE._serialized_start=106
-  _MESSAGINGSERVICE._serialized_end=190
+  _FILE_PAYLOAD._serialized_end=58
+  _BBOXES._serialized_start=60
+  _BBOXES._serialized_end=101
+  _BBOX._serialized_start=103
+  _BBOX._serialized_end=182
+  _MESSAGINGSERVICE._serialized_start=184
+  _MESSAGINGSERVICE._serialized_end=268
 # @@protoc_insertion_point(module_scope)

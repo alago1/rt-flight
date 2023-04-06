@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 import time
@@ -12,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import PIL
 import smopy
+import exiftool
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
 
@@ -101,9 +101,7 @@ class ObjectDetectionLayer:
         return np.array(bboxes_with_confidence).astype(int)
 
     def run(self, img_path):
-        bboxes_pixels = self._get_bboxes_pixels(img_path)
-
-        return ([], []) if len(bboxes_pixels) == 0 else bboxes_pixels
+        return self._get_bboxes_pixels(img_path)
 
 
 class GPSTranslocationLayer:
@@ -112,45 +110,55 @@ class GPSTranslocationLayer:
     altitude = None
     heading = None
 
-    sensorw = None
-    sensorh = None
-
-    focal_length = None
-
-    imagew = None
-    imageh = None
+    half_image_width_meters = None
+    half_image_height_meters = None
 
     top_left = None
     top_right = None
     bottom_left = None
     bottom_right = None
 
-    v_fov = None
-    h_fov = None
+    image_width = None
+    image_height = None
 
-    v_dist = None
-    h_dist = None
+    def _load_metadata(self, image_path):
+        with exiftool.ExifToolHelper() as et:
+            metadata = et.get_metadata(image_path)[0]
 
-    aspect_ratio = None
+        self.latitude = metadata["EXIF:GPSLatitude"]
+        self.longitude = metadata["EXIF:GPSLongitude"]
+        self.altitude = metadata["EXIF:GPSAltitude"]
+        self.heading = metadata["EXIF:GPSImgDirection"]
 
-    def _get_data_from_json(self, json_data):
-        data = json.loads(json_data)
+        if metadata["EXIF:GPSLatitudeRef"] == "S":
+            assert self.latitude >= 0, "Latitude is negative but ref is S"
+            self.latitude *= -1
 
-        self.altitude = data["altitude"]
-        self.latitude = data["latitude"]
-        self.longitude = data["longitude"]
-        self.heading = data["heading"]
-        self.sensorh = data["sensorh"]
-        self.sensorw = data["sensorw"]
-        self.focal_length = data["focal_length"]
-        self.imagew = data["imagew"]
-        self.imageh = data["imageh"]
+        if metadata["EXIF:GPSLongitudeRef"] == "W":
+            assert self.longitude >= 0, "Longitude is negative but ref is W"
+            self.longitude *= -1
 
-    def _destination_point(self, start_lat, start_lon, heading, distance):
+        if metadata["EXIF:GPSImgDirectionRef"] == "M":
+            assert (
+                np.abs(self.heading) > 2 * np.pi
+            ), "Heading is in radians but we assume degrees. Please fix"
+            self.heading -= 8.0  # subtract 8deg to account for magnetic declination
+
+        focal_length = metadata["EXIF:FocalLength"]
+        sensor_width = metadata["EXIF:SensorWidth"]  # this header might be wrong
+        sensor_height = metadata["EXIF:SensorHeight"]  # this header might be wrong
+
+        self.half_image_width_meters = self.altitude * sensor_width / focal_length
+        self.half_image_height_meters = self.altitude * sensor_height / focal_length
+
+        self.image_width = metadata["EXIF:ImageWidth"]
+        self.image_height = metadata["EXIF:ImageHeight"]
+
+    def _destination_point(self, start_lat, start_lon, bearing, distance):
         start_point = geopy.Point(start_lat, start_lon)
         distance = geopy.distance.distance(meters=distance)
         destination_point = distance.destination(
-            point=start_point, bearing=heading
+            point=start_point, bearing=bearing
         )  # i have no idea if this uses true north or magnetic north or grid north. geography sucks
         return destination_point.latitude, destination_point.longitude
 
@@ -192,108 +200,124 @@ class GPSTranslocationLayer:
         plt.scatter(
             [det_lat, det_lat],
             [det_lon, det_lon],
-            s=(self.imagew / 2) / self.h_dist * radius,
+            s=(self.image_width / 2) / self.half_image_width_meters * radius,
         )
         plt.show()
 
     def _get_corner_coordinates(self):
-        self.h_fov = 2 * np.degrees(np.atan(self.sensorw / (2 * self.focal_length)))
-        self.v_fov = 2 * np.degrees(np.atan(self.sensorh / (2 * self.focal_length)))
-
-        self.h_dist = self.altitude * np.tan(np.radians(self.h_fov / 2))
-        self.v_dist = self.altitude * np.tan(np.radians(self.h_fov / 2))
-
-        self.aspect_ratio = self.imagew / self.imageh
-
-        # Calculate the distances to the top-right and bottom-left corners
-        d_top_right = np.sqrt((self.h_dist) ** 2 + (self.v_dist) ** 2)
-        d_bottom_left = d_top_right
-
-        # Calculate the distances to the top-left and bottom-right corners
-        d_top_left = np.sqrt(
-            (self.h_dist) ** 2 + (self.v_dist * self.aspect_ratio) ** 2
+        # Calculate the distances to the corners
+        distance_to_corner = np.sqrt(
+            (self.half_image_width_meters) ** 2 + (self.half_image_height_meters) ** 2
         )
-        d_bottom_right = d_top_left
 
         # Calculate the bearings from the center to the corners
         bearing_top_right = (
-            self.heading - 180 + np.degrees(np.atan2(self.h_dist, self.v_dist))
+            self.heading
+            - 180
+            + np.degrees(
+                np.arctan2(self.half_image_height_meters, self.half_image_width_meters)
+            )
         ) % 360
         bearing_top_left = (
-            self.heading - 180 + np.degrees(np.atan2(-self.h_dist, self.v_dist))
+            self.heading
+            - 180
+            + np.degrees(
+                np.arctan2(self.half_image_height_meters, -self.half_image_width_meters)
+            )
         ) % 360
         bearing_bottom_right = (
-            self.heading - 180 + np.degrees(np.atan2(self.h_dist, -self.v_dist))
+            self.heading
+            - 180
+            + np.degrees(
+                np.arctan2(-self.half_image_height_meters, self.half_image_width_meters)
+            )
         ) % 360
         bearing_bottom_left = (
-            self.heading - 180 + np.degrees(np.atan2(-self.h_dist, -self.v_dist))
+            self.heading
+            - 180
+            + np.degrees(
+                np.arctan2(
+                    -self.half_image_height_meters, -self.half_image_width_meters
+                )
+            )
         ) % 360
 
         # Calculate the GPS coordinates of the corners
         self.top_right = self._destination_point(
-            self.latitude, self.longitude, bearing_top_right, d_top_right
+            self.latitude, self.longitude, bearing_top_right, distance_to_corner
         )
         self.top_left = self._destination_point(
-            self.latitude, self.longitude, bearing_top_left, d_top_left
+            self.latitude, self.longitude, bearing_top_left, distance_to_corner
         )
         self.bottom_right = self._destination_point(
-            self.latitude, self.longitude, bearing_bottom_right, d_bottom_right
+            self.latitude, self.longitude, bearing_bottom_right, distance_to_corner
         )
         self.bottom_left = self._destination_point(
-            self.latitude, self.longitude, bearing_bottom_left, d_bottom_left
+            self.latitude, self.longitude, bearing_bottom_left, distance_to_corner
         )
 
     def _pixel_to_gps(self, pixel):
         x, y = pixel
-        mid_x = self.imagew / 2
-        mid_y = self.imageh / 2
 
-        pixel_heading = self.heading + np.degrees(np.atan2(x - mid_x, y - mid_y))
+        center_relative_position_pixel = (x - self.image_width, y - self.image_height)
 
-        loc_x = (x - mid_x) / mid_x
-        loc_y = (y - mid_y) / mid_y
-
-        dist_loc_x = loc_x * self.h_dist
-        dist_loc_y = loc_y * self.v_dist
-
-        distance = np.sqrt(dist_loc_x**2 + dist_loc_y**2)
-
-        return self._destination_point(
-            self.latitude, self.longitude, pixel_heading, distance
+        pixel_heading = (
+            self.heading + np.degrees(np.arctan2(*center_relative_position_pixel)) + 90  # this may be wrong :shrug:
         )
 
-    def _bbox_pixels_to_gps(self, bbox_pixels):
-        x_min, y_min, x_max, y_max = bbox_pixels
+        displacement_x_meters = (
+            (center_relative_position_pixel[0] / self.image_width)
+            * 2
+            * self.half_image_height_meters
+        )
+        displacement_y_meters = (
+            (center_relative_position_pixel[1] / self.image_height)
+            * 2
+            * self.half_image_width_meters
+        )
 
-        coord_1 = self._pixel_to_gps((x_min, y_min))
-        coord_2 = self._pixel_to_gps((x_max, y_max))
+        distance_meters = np.sqrt(
+            displacement_x_meters**2 + displacement_y_meters**2
+        )
 
-        return coord_1, coord_2
+        return self._destination_point(
+            self.latitude, self.longitude, pixel_heading, distance_meters
+        )
 
-    def _get_center_of_bbox(self, coord1, coord2):
-        lat1, lon1 = coord1
-        lat2, lon2 = coord2
+    def _bbox_pixels_to_center_gps(self, bbox_pixels):
+        x_min, x_max, y_min, y_max = bbox_pixels  # x: rows, y: cols
 
-        return (lat1 + lat2) / 2, (lon1 + lon2) / 2
+        bbox_center = (x_min + x_max) / 2, (y_min + y_max) / 2
+        return self._pixel_to_gps(bbox_center)
 
-    def _get_radius_of_bbox_in_meters(self, coord1, coord2):
-        lon1, lat1 = coord1
-        lon2, lat2 = coord2
-        return geopy.distance.distance((lat1, lon1), (lat2, lon2)).m / 2
+    def _get_radius_of_bbox_in_meters(self, bbox_pixels):
+        x_min, x_max, y_min, y_max = bbox_pixels  # x: rows, y: cols
+        axis_length_pixels = (x_max - x_min) / 2, (y_max - y_min) / 2
+        axis_length_meters = (
+            axis_length_pixels[0]
+            / self.image_height
+            * 2
+            * self.half_image_height_meters,
+            axis_length_pixels[1] / self.image_width * 2 * self.half_image_width_meters,
+        )
+
+        return np.sqrt(axis_length_meters[0] ** 2 + axis_length_meters[1] ** 2)
 
     def _bbox_gps_center_and_radius_in_meters(self, bbox_pixels):
-        coord_1, coord_2 = self._bbox_pixels_to_gps(bbox_pixels)
-        center = self._get_center_of_bbox(coord_1, coord_2)
-        radius = self._get_radius_of_bbox_in_meters(coord_1, coord_2)
+        center = self._bbox_pixels_to_center_gps(bbox_pixels)
+        radius = self._get_radius_of_bbox_in_meters(bbox_pixels)
         return center, radius
 
-    def run(self, image_path, json_data, bboxes):
-        self._get_data_from_json(json_data)
+    def run(self, image_path, bboxes):
+        self._load_metadata(image_path)
         self._get_corner_coordinates()
+
         out = None
         for bbox in bboxes:
             out = self._bbox_gps_center_and_radius_in_meters(bbox)
         self._plot_corners_on_map_with_detection(*out)
+
+        return out
 
 
 class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
@@ -304,20 +328,20 @@ class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
         bboxes_pixels = obj_layer.run(request.path)
         print(bboxes_pixels)
 
-        if bboxes_pixels == ([], []):
-            return messaging_pb2.BBoxes(jsondata="No objects detected")
+        if len(bboxes_pixels) == 0:
+            return messaging_pb2.BBoxes(bboxes=[])
 
-        gps_translation_layer.run(request.path, request.jsondata, bboxes_pixels)
+        gps_translation_layer.run(request.path, bboxes_pixels)
 
-        return messaging_pb2.BBoxes(jsondata="Data received and added to buffer")
+        return messaging_pb2.BBoxes(bboxes=bboxes_pixels)
 
 
 def serve():
     global obj_layer, gps_translation_layer
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    weights_file = "weights/yolov3-aerial.weights"
-    config_file = "weights/yolov3-aerial.cfg"
+    weights_file = "yolo/yolov3-aerial.weights"
+    config_file = "yolo/yolov3-aerial.cfg"
 
     obj_layer = ObjectDetectionLayer(config_file=config_file, weights_file=weights_file)
 
