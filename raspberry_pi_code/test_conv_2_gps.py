@@ -176,10 +176,9 @@ class GPSTranslocationLayer:
         return (lat1 + lat2) / 2, (lon1 + lon2) / 2
 
     def _get_radius_of_bbox_in_meters(self, coord1, coord2):
-        lat1, lon1 = coord1
-        lat2, lon2 = coord2
-
-        return distance.distance(coord1, coord2).m * 2
+        lon1, lat1 = coord1
+        lon2, lat2 = coord2
+        return distance.distance((lat1, lon1), (lat2, lon2)).m / 2
 
     def _bbox_gps_center_and_radius_in_meters(self, bbox_pixels):
         coord_1, coord_2 = self._bbox_pixels_to_gps(bbox_pixels)

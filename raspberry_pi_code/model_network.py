@@ -1,18 +1,14 @@
+import geopy
 import grpc
 from concurrent import futures
 import time
 import os, sys
-
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL import Image
-from PIL.ExifTags import TAGS
-from scipy.ndimage import rotate
+import PIL
 import cv2
 import json
-from math import radians, degrees, sin, cos, tan, atan2, sqrt, atan, asin
 import smopy
-from geopy import distance
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
 
@@ -21,7 +17,7 @@ import messaging_pb2_grpc
 
 class ObjectDetectionLayer:
     def __init__(
-        self, weights_file=None, classes_file=None, config_file=None, min_confidence=0.3
+        self, weights_file=None, config_file=None, min_confidence=0.3
     ):
         self.weights_file = weights_file
         self.config_file = config_file
@@ -47,7 +43,7 @@ class ObjectDetectionLayer:
         return output_layers
 
     def _get_bboxes_pixels(self, img_path):
-        img = Image.open(img_path)
+        img = PIL.Image.open(img_path)
         img = np.array(img)
         
         image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
@@ -151,11 +147,11 @@ class GPSTranslocationLayer:
             
     def _destination_point(self, lat1, lon1, heading, distance):
         # Convert latitude and longitude from degrees to radians
-        lat1 = radians(lat1)
-        lon1 = radians(lon1)
+        lat1 = np.radians(lat1)
+        lon1 = np.radians(lon1)
 
         # Convert the bearing to radians
-        bearing = radians(heading)
+        bearing = np.radians(heading)
 
         # Earth's mean radius in meters (6,371,000 meters)
         earth_radius = 6371000
@@ -164,16 +160,16 @@ class GPSTranslocationLayer:
         angular_distance = distance / earth_radius
 
         # Calculate the destination point's latitude
-        lat2 = asin(sin(lat1) * cos(angular_distance) +
-                        cos(lat1) * sin(angular_distance) * cos(bearing))
+        lat2 = np.asin(np.sin(lat1) * np.cos(angular_distance) +
+                       np.cos(lat1) * np.sin(angular_distance) * np.cos(bearing))
 
         # Calculate the destination point's longitude
-        lon2 = lon1 + atan2(sin(bearing) * sin(angular_distance) * cos(lat1),
-                                cos(angular_distance) - sin(lat1) * sin(lat2))
+        lon2 = lon1 + np.atan2(np.sin(bearing) * np.sin(angular_distance) * np.cos(lat1),
+                                np.cos(angular_distance) - np.sin(lat1) * np.sin(lat2))
 
         # Convert the latitude and longitude from radians back to degrees
-        lat2 = degrees(lat2)
-        lon2 = degrees(lon2)
+        lat2 = np.degrees(lat2)
+        lon2 = np.degrees(lon2)
 
         return lon2, lat2
 
@@ -214,27 +210,27 @@ class GPSTranslocationLayer:
         plt.show()
 
     def _get_corner_coordinates(self):
-        self.h_fov = 2 * degrees(atan(self.sensorw / (2 * self.focal_length)))
-        self.v_fov = 2 * degrees(atan(self.sensorh / (2 * self.focal_length)))
+        self.h_fov = 2 * np.degrees(np.atan(self.sensorw / (2 * self.focal_length)))
+        self.v_fov = 2 * np.degrees(np.atan(self.sensorh / (2 * self.focal_length)))
 
-        self.h_dist = self.altitude * tan(radians(self.h_fov/2))
-        self.v_dist = self.altitude * tan(radians(self.h_fov/2))
+        self.h_dist = self.altitude * np.tan(np.radians(self.h_fov/2))
+        self.v_dist = self.altitude * np.tan(np.radians(self.h_fov/2))
         
         self.aspect_ratio = self.imagew / self.imageh
 
         # Calculate the distances to the top-right and bottom-left corners
-        d_top_right = sqrt((self.h_dist) ** 2 + (self.v_dist) ** 2)
+        d_top_right = np.sqrt((self.h_dist) ** 2 + (self.v_dist) ** 2)
         d_bottom_left = d_top_right
 
         # Calculate the distances to the top-left and bottom-right corners
-        d_top_left = sqrt((self.h_dist) ** 2 + (self.v_dist * self.aspect_ratio) ** 2)
+        d_top_left = np.sqrt((self.h_dist) ** 2 + (self.v_dist * self.aspect_ratio) ** 2)
         d_bottom_right = d_top_left
 
         # Calculate the bearings from the center to the corners
-        bearing_top_right = (self.heading - 180 + degrees(atan2(self.h_dist, self.v_dist))) % 360
-        bearing_top_left = (self.heading - 180 + degrees(atan2(-self.h_dist, self.v_dist))) % 360
-        bearing_bottom_right = (self.heading - 180 + degrees(atan2(self.h_dist, -self.v_dist))) % 360
-        bearing_bottom_left = (self.heading - 180 + degrees(atan2(-self.h_dist, -self.v_dist))) % 360
+        bearing_top_right = (self.heading - 180 + np.degrees(np.atan2(self.h_dist, self.v_dist))) % 360
+        bearing_top_left = (self.heading - 180 + np.degrees(np.atan2(-self.h_dist, self.v_dist))) % 360
+        bearing_bottom_right = (self.heading - 180 + np.degrees(np.atan2(self.h_dist, -self.v_dist))) % 360
+        bearing_bottom_left = (self.heading - 180 + np.degrees(np.atan2(-self.h_dist, -self.v_dist))) % 360
 
         # Calculate the GPS coordinates of the corners
         self.top_right = self._destination_point(self.latitude, self.longitude, bearing_top_right, d_top_right)
@@ -247,16 +243,15 @@ class GPSTranslocationLayer:
         mid_x = self.imagew/2
         mid_y = self.imageh/2
 
-        pixel_heading = self.heading + degrees(atan2(x - mid_x, y - mid_y))
+        pixel_heading = self.heading + np.degrees(np.atan2(x - mid_x, y - mid_y))
         
-        #calculate the distance between the pixel and the center of the image using self.h_dist and self.v_dist
         loc_x = (x - mid_x) / mid_x
         loc_y = (y - mid_y) / mid_y
         
         dist_loc_x = loc_x * self.h_dist
         dist_loc_y = loc_y * self.v_dist
         
-        distance = sqrt(dist_loc_x ** 2 + dist_loc_y ** 2)
+        distance = np.sqrt(dist_loc_x ** 2 + dist_loc_y ** 2)
 
         return self._destination_point(
             self.latitude, self.longitude, pixel_heading, distance
@@ -277,10 +272,9 @@ class GPSTranslocationLayer:
         return (lat1 + lat2) / 2, (lon1 + lon2) / 2
 
     def _get_radius_of_bbox_in_meters(self, coord1, coord2):
-        lat1, lon1 = coord1
-        lat2, lon2 = coord2
-
-        return distance.distance(coord1, coord2).m * 2
+        lon1, lat1 = coord1
+        lon2, lat2 = coord2
+        return geopy.distance.distance((lat1, lon1), (lat2, lon2)).m / 2
 
     def _bbox_gps_center_and_radius_in_meters(self, bbox_pixels):
         coord_1, coord_2 = self._bbox_pixels_to_gps(bbox_pixels)

@@ -143,15 +143,36 @@ def update_map():
 
                 assigned_colors = scatter_plot.to_rgba(cluster_labels)
 
-                cursor = mplcursors.cursor(scatter_plot, hover=True)
+                annot = ax.annotate("", xy=(0, 0), xytext=(20, 20),
+                    textcoords="offset points",
+                    bbox=dict(boxstyle="round", fc="w"),
+                    arrowprops=dict(arrowstyle="->"))
+                annot.set_visible(False)
 
-                @cursor.connect("add")
-                def on_add(sel):
-                    uuid = sel.index
+                def update_annot(ind):
+                    pos = scatter_plot.get_offsets()[ind["ind"][0]]
+                    annot.xy = pos
+                    uuid = ind["ind"][0]
                     cluster_label = cluster_labels[uuid]
                     lat, lon, rad, conf = data[uuid]
                     cluster_size = np.count_nonzero(cluster_labels == cluster_label)
-                    sel.annotation.set_text(format_tooltip_text(uuid, cluster_label, lat, lon, rad, conf, cluster_size))        
+                    text = format_tooltip_text(uuid, cluster_label, lat, lon, rad, conf, cluster_size)
+                    annot.set_text(text)
+
+                def hover(evt):
+                    vis = annot.get_visible()
+                    if evt.inaxes == ax:
+                        cont, ind = scatter_plot.contains(evt)
+                        if cont:
+                            update_annot(ind)
+                            annot.set_visible(True)
+                            fig.canvas.draw_idle()
+                        else:
+                            if vis:
+                                annot.set_visible(False)
+                                fig.canvas.draw_idle()
+
+                fig.canvas.mpl_connect("motion_notify_event", hover)
 
         for uuid_count, data_point, assigned_color in zip(range(len(data)), data, assigned_colors):
             lat, lon, rad, conf = data_point
