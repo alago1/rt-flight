@@ -27,10 +27,14 @@ root = tk.Tk()
 root.geometry("800x1100")
 
 map_updated = False
+sort_column = "UUID"
+sort_reverse = False
 
 fig = Figure(frameon=False)
 ax = fig.add_subplot(111)
 ax.axis("off")
+ax.set_xticks([])
+ax.set_yticks([])
 
 def format_tooltip_text(uuid, cluster_label, lat, lon, rad, conf, cluster_size):
     lat = "{:.7f}".format(lat)
@@ -55,6 +59,19 @@ def show_waiting_text():
     y = (waiting_img.height - text_height) // 2
     draw.text((x, y), text, font=font, fill=(0, 0, 0, 255))
     return waiting_img
+
+def treeview_sort_column(tv, col, reverse):
+    global sort_column, sort_reverse
+    sort_column = col
+    sort_reverse = reverse
+
+    l = [(tv.set(k, col), k) for k in tv.get_children('')]
+    l.sort(key=lambda t: float(t[0] if t[0] != "Noise" else -1), reverse=reverse)
+
+    for index, (val, k) in enumerate(l):
+        tv.move(k, '', index)
+
+    tv.heading(col, command=lambda: treeview_sort_column(tv, col, not reverse))
 
 waiting_img = show_waiting_text()
 ax.imshow(waiting_img, interpolation="lanczos", origin="upper")
@@ -81,13 +98,13 @@ table.column("radius", anchor=tk.CENTER, width=100)
 table.column("conf", anchor=tk.CENTER, width=75)
 table.column("cluster", anchor=tk.CENTER, width=100)
 
-table.heading("#0", text="", anchor=tk.CENTER)
-table.heading("UUID", text="UUID", anchor=tk.CENTER)
-table.heading("lat", text="lat", anchor=tk.CENTER)
-table.heading("long", text="long", anchor=tk.CENTER)
-table.heading("radius", text="radius (m)", anchor=tk.CENTER)
-table.heading("conf", text="conf", anchor=tk.CENTER)
-table.heading("cluster", text="cluster", anchor=tk.CENTER)
+table.heading("UUID", text="UUID", anchor=tk.CENTER, command=lambda: treeview_sort_column(table, "UUID", False))
+table.heading("lat", text="lat", anchor=tk.CENTER, command=lambda: treeview_sort_column(table, "lat", False))
+table.heading("long", text="long", anchor=tk.CENTER, command=lambda: treeview_sort_column(table, "long", False))
+table.heading("radius", text="radius (m)", anchor=tk.CENTER, command=lambda: treeview_sort_column(table, "radius", False))
+table.heading("conf", text="conf", anchor=tk.CENTER, command=lambda: treeview_sort_column(table, "conf", False))
+table.heading("cluster", text="cluster", anchor=tk.CENTER, command=lambda: treeview_sort_column(table, "cluster", False))
+
 
 table.pack()
 
@@ -102,12 +119,7 @@ def process_response_data(data, eps=0.0005, min_samples=3):
     return samples, labels
 
 def update_map():
-    global uuid_count
-    global map_updated
-    global map_
-    global old_len
-    global new_cmap
-    global assigned_colors
+    global uuid_count, map_updated, map_, old_len, new_cmap, assigned_colors
 
     current_scroll_position = table.yview()[0]
     table.delete(*table.get_children())
@@ -184,7 +196,16 @@ def update_map():
                 index="end",
                 iid=uuid_count,
                 text="",
-                values=[str(v) for v in (str(uuid_count), "{:.7f}".format(lat), "{:.7f}".format(lon), "{:.2f}".format(rad), int(conf), cluster_labels[uuid_count] if cluster_labels[uuid_count] != -1 else "Noise")],
+                values=[
+                    int(uuid_count),
+                    float("{:.7f}".format(lat)),
+                    float("{:.7f}".format(lon)),
+                    float("{:.2f}".format(rad)),
+                    int(conf),
+                    cluster_labels[uuid_count]
+                    if cluster_labels[uuid_count] != -1
+                    else "Noise",
+                ],
                 tags=(color_hex,),
             )
 
@@ -194,6 +215,7 @@ def update_map():
         else:
             # Maintain the current scrollbar position
             table.yview_moveto(current_scroll_position)
+        treeview_sort_column(table, sort_column, sort_reverse)
 
     canvas.draw()
     root.after(1000, update_map)
@@ -213,11 +235,12 @@ def _extracted_from_update_map_15(data):
     map_ = smopy.Map((lat_min, lon_min, lat_max, lon_max), z=17)
 
     map_img = map_.to_pil()
-
     ax.clear()
     ax.imshow(map_img, interpolation="lanczos", origin="upper")
-    result = True
-    return result
+    ax.set_xlim(0, map_img.size[0])
+    ax.set_ylim(map_img.size[1], 0)
+    ax.axis("off")
+    return True
 
 update_map()
 root.mainloop()

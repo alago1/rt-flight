@@ -12,6 +12,7 @@ import numpy as np
 import PIL
 import smopy
 import exiftool
+from exif import Image as ExifImage
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
 
@@ -122,37 +123,51 @@ class GPSTranslocationLayer:
     image_height = None
 
     def _load_metadata(self, image_path):
-        with exiftool.ExifToolHelper() as et:
-            metadata = et.get_metadata(image_path)[0]
+        with open(image_path, 'rb') as image_file:
+            exif_img = ExifImage(image_file)
+            
+        lat = exif_img.gps_latitude
+        lon = exif_img.gps_longitude
+        
+        self.latitude = lat[0] + lat[1]/60 + lat[2]/3600
+        self.longitude = lon[0] + lon[1]/60 + lon[2]/3600
+        self.altitude = exif_img.gps_altitude
+        self.heading = exif_img.gps_img_direction
+        self.image_width = exif_img.pixel_x_dimension
+        self.image_height = exif_img.pixel_y_dimension
+        
+        sensor_width = exif_img.lens_specification[0]
+        sensor_height = exif_img.lens_specification[1]
+        focal_length = exif_img.focal_length
 
-        self.latitude = metadata["EXIF:GPSLatitude"]
-        self.longitude = metadata["EXIF:GPSLongitude"]
-        self.altitude = metadata["EXIF:GPSAltitude"]
-        self.heading = metadata["EXIF:GPSImgDirection"]
+        # self.latitude = metadata["EXIF:GPSLatitude"]
+        # self.longitude = metadata["EXIF:GPSLongitude"]
+        # self.altitude = metadata["EXIF:GPSAltitude"]
+        # self.heading = metadata["EXIF:GPSImgDirection"]
 
-        if metadata["EXIF:GPSLatitudeRef"] == "S":
-            assert self.latitude >= 0, "Latitude is negative but ref is S"
-            self.latitude *= -1
+        # if metadata["EXIF:GPSLatitudeRef"] == "S":
+        #     assert self.latitude >= 0, "Latitude is negative but ref is S"
+        #     self.latitude *= -1
 
-        if metadata["EXIF:GPSLongitudeRef"] == "W":
-            assert self.longitude >= 0, "Longitude is negative but ref is W"
-            self.longitude *= -1
+        # if metadata["EXIF:GPSLongitudeRef"] == "W":
+        #     assert self.longitude >= 0, "Longitude is negative but ref is W"
+        #     self.longitude *= -1
 
-        if metadata["EXIF:GPSImgDirectionRef"] == "M":
-            assert (
-                np.abs(self.heading) > 2 * np.pi
-            ), "Heading is in radians but we assume degrees. Please fix"
-            self.heading -= 8.0  # subtract 8deg to account for magnetic declination
+        # if metadata["EXIF:GPSImgDirectionRef"] == "M":
+        #     assert (
+        #         np.abs(self.heading) > 2 * np.pi
+        #     ), "Heading is in radians but we assume degrees. Please fix"
+        #     self.heading -= 8.0  # subtract 8deg to account for magnetic declination
 
-        focal_length = metadata["EXIF:FocalLength"]
-        sensor_width = metadata["EXIF:SensorWidth"]  # this header might be wrong
-        sensor_height = metadata["EXIF:SensorHeight"]  # this header might be wrong
+        # focal_length = metadata["EXIF:FocalLength"]
+        # sensor_width = metadata["EXIF:SensorWidth"]  # this header might be wrong
+        # sensor_height = metadata["EXIF:SensorHeight"]  # this header might be wrong
 
         self.half_image_width_meters = self.altitude * sensor_width / focal_length
         self.half_image_height_meters = self.altitude * sensor_height / focal_length
 
-        self.image_width = metadata["EXIF:ImageWidth"]
-        self.image_height = metadata["EXIF:ImageHeight"]
+        # self.image_width = metadata["EXIF:ImageWidth"]
+        # self.image_height = metadata["EXIF:ImageHeight"]
 
     def _destination_point(self, start_lat, start_lon, bearing, distance):
         start_point = geopy.Point(start_lat, start_lon)
@@ -306,18 +321,16 @@ class GPSTranslocationLayer:
     def _bbox_gps_center_and_radius_in_meters(self, bbox_pixels):
         center = self._bbox_pixels_to_center_gps(bbox_pixels)
         radius = self._get_radius_of_bbox_in_meters(bbox_pixels)
-        return center, radius
+        return center[0], center[1], radius
 
     def run(self, image_path, bboxes):
         self._load_metadata(image_path)
         self._get_corner_coordinates()
 
-        out = None
-        for bbox in bboxes:
-            out = self._bbox_gps_center_and_radius_in_meters(bbox)
-        self._plot_corners_on_map_with_detection(*out)
-
-        return out
+        return [
+            (self._bbox_gps_center_and_radius_in_meters(bbox[:4]) + (bbox[4],))
+            for bbox in bboxes
+        ]
 
 
 class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
@@ -326,22 +339,30 @@ class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
 
     def GetBoundingBoxes(self, request, context):
         bboxes_pixels = obj_layer.run(request.path)
-        print(bboxes_pixels)
 
         if len(bboxes_pixels) == 0:
             return messaging_pb2.BBoxes(bboxes=[])
 
-        gps_translation_layer.run(request.path, bboxes_pixels)
+        output = gps_translation_layer.run(request.path, bboxes_pixels)
 
-        return messaging_pb2.BBoxes(bboxes=bboxes_pixels)
+        bbox_list = [
+            messaging_pb2.BBox(
+                latitude=bbox[0],
+                longitude=bbox[1],
+                radius=bbox[2],
+                confidence=bbox[3],
+            )
+            for bbox in output
+        ]
+        return messaging_pb2.BBoxes(bboxes=bbox_list)
 
 
 def serve():
     global obj_layer, gps_translation_layer
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    weights_file = "yolo/yolov3-aerial.weights"
-    config_file = "yolo/yolov3-aerial.cfg"
+    weights_file = "weights/yolov3-aerial.weights"
+    config_file = "weights/yolov3-aerial.cfg"
 
     obj_layer = ObjectDetectionLayer(config_file=config_file, weights_file=weights_file)
 
