@@ -1,12 +1,9 @@
 import grpc
 import os, sys
-import random
-import json
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
 import messaging_pb2
 import messaging_pb2_grpc
-import time
 
 def run(port_num):
     channel = grpc.insecure_channel(f'localhost:{port_num}')
