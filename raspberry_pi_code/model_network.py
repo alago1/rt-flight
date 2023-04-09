@@ -20,9 +20,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
 import messaging_pb2
 import messaging_pb2_grpc
 
-
 def log(message):
-    with open('log.txt', 'a') as f:
+    global log_path
+    with open(log_path, 'a') as f:
         with redirect_stdout(f):
             print(message)
 
@@ -390,5 +390,8 @@ def serve(port_num):
 
 
 if __name__ == "__main__":
+    global log_path
     port_arg = sys.argv[1] if len(sys.argv) > 1 else 50051
+    log_path = sys.argv[2] if len(sys.argv) > 2 else "logs.txt"
     serve(port_num=port_arg)
+
