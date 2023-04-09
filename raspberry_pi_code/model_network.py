@@ -13,11 +13,18 @@ import PIL
 import smopy
 import exiftool
 from exif import Image as ExifImage
+from contextlib import redirect_stdout
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
 
 import messaging_pb2
 import messaging_pb2_grpc
+
+
+def log(message):
+    with open('log.txt', 'a') as f:
+        with redirect_stdout(f):
+            print(message)
 
 
 class ObjectDetectionLayer:
@@ -102,7 +109,12 @@ class ObjectDetectionLayer:
         return np.array(bboxes_with_confidence).astype(int)
 
     def run(self, img_path):
-        return self._get_bboxes_pixels(img_path)
+        log("*" * 75)
+        log(f"Running object detection on image: {img_path}")
+        output = self._get_bboxes_pixels(img_path)
+        log(f"Number of detections found: {len(output)}")
+        log("*" * 75)
+        return output
 
 
 class GPSTranslocationLayer:
@@ -125,56 +137,48 @@ class GPSTranslocationLayer:
     def _load_metadata(self, image_path):
         with open(image_path, 'rb') as image_file:
             exif_img = ExifImage(image_file)
-            
+        
+        img = PIL.Image.open(image_path)
+        self.image_width = img.width
+        self.image_height = img.height
+        img.close()    
+        
         lat = exif_img.gps_latitude
+        lat = lat[0] + lat[1]/60 + lat[2]/3600
+        
         lon = exif_img.gps_longitude
+        lon = lon[0] + lon[1]/60 + lon[2]/3600
         
-        self.latitude = lat[0] + lat[1]/60 + lat[2]/3600
-        self.longitude = lon[0] + lon[1]/60 + lon[2]/3600
+        self.latitude = lat if exif_img.gps_latitude_ref == 'N' else -lat
+        self.longitude = lon if exif_img.gps_longitude_ref == 'E' else -lon
+        
         self.altitude = exif_img.gps_altitude
-        self.heading = exif_img.gps_img_direction
-        self.image_width = exif_img.pixel_x_dimension
-        self.image_height = exif_img.pixel_y_dimension
         
-        sensor_width = exif_img.lens_specification[0]
-        sensor_height = exif_img.lens_specification[1]
+        self.heading = exif_img.gps_img_direction if exif_img.gps_img_direction_ref == 'T' else exif_img.gps_img_direction + 8
+        
+        sensor_width = exif_img.focal_plane_x_resolution / 1000
+        sensor_height = exif_img.focal_plane_y_resolution / 1000
         focal_length = exif_img.focal_length
-
-        # self.latitude = metadata["EXIF:GPSLatitude"]
-        # self.longitude = metadata["EXIF:GPSLongitude"]
-        # self.altitude = metadata["EXIF:GPSAltitude"]
-        # self.heading = metadata["EXIF:GPSImgDirection"]
-
-        # if metadata["EXIF:GPSLatitudeRef"] == "S":
-        #     assert self.latitude >= 0, "Latitude is negative but ref is S"
-        #     self.latitude *= -1
-
-        # if metadata["EXIF:GPSLongitudeRef"] == "W":
-        #     assert self.longitude >= 0, "Longitude is negative but ref is W"
-        #     self.longitude *= -1
-
-        # if metadata["EXIF:GPSImgDirectionRef"] == "M":
-        #     assert (
-        #         np.abs(self.heading) > 2 * np.pi
-        #     ), "Heading is in radians but we assume degrees. Please fix"
-        #     self.heading -= 8.0  # subtract 8deg to account for magnetic declination
-
-        # focal_length = metadata["EXIF:FocalLength"]
-        # sensor_width = metadata["EXIF:SensorWidth"]  # this header might be wrong
-        # sensor_height = metadata["EXIF:SensorHeight"]  # this header might be wrong
 
         self.half_image_width_meters = self.altitude * sensor_width / focal_length
         self.half_image_height_meters = self.altitude * sensor_height / focal_length
-
-        # self.image_width = metadata["EXIF:ImageWidth"]
-        # self.image_height = metadata["EXIF:ImageHeight"]
+        
+        log("*" * 75)
+        log(f"Loaded metadata from image: {image_path}")
+        log(f"Image dimensions:{self.image_width}, {self.image_height}")
+        log(f"GPS coordinates: {self.latitude}, {self.longitude}")
+        log(f"Altitude: {self.altitude}")
+        log(f"Heading: {self.heading}")
+        log(f"Half image width in meters: {self.half_image_width_meters}")
+        log(f"Half image height in meters: {self.half_image_height_meters}")
+        log("*" * 75)
 
     def _destination_point(self, start_lat, start_lon, bearing, distance):
         start_point = geopy.Point(start_lat, start_lon)
         distance = geopy.distance.distance(meters=distance)
         destination_point = distance.destination(
             point=start_point, bearing=bearing
-        )  # i have no idea if this uses true north or magnetic north or grid north. geography sucks
+        ) 
         return destination_point.latitude, destination_point.longitude
 
     def _plot_corners_on_map(self, zoom=14):
@@ -321,6 +325,8 @@ class GPSTranslocationLayer:
     def _bbox_gps_center_and_radius_in_meters(self, bbox_pixels):
         center = self._bbox_pixels_to_center_gps(bbox_pixels)
         radius = self._get_radius_of_bbox_in_meters(bbox_pixels)
+        log(f"Detection for center: {center}, radius: {radius}")
+        log("*" * 75)
         return center[0], center[1], radius
 
     def run(self, image_path, bboxes):
@@ -357,12 +363,14 @@ class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
         return messaging_pb2.BBoxes(bboxes=bbox_list)
 
 
-def serve():
+def serve(port_num):
     global obj_layer, gps_translation_layer
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     weights_file = "weights/yolov3-aerial.weights"
     config_file = "weights/yolov3-aerial.cfg"
+
+    log(f"Using detection model with weights from {weights_file} and config from {config_file}")
 
     obj_layer = ObjectDetectionLayer(config_file=config_file, weights_file=weights_file)
 
@@ -371,9 +379,9 @@ def serve():
     messaging_pb2_grpc.add_MessagingServiceServicer_to_server(
         MessagingService(), server
     )
-    server.add_insecure_port("[::]:50051")
+    server.add_insecure_port(f"[::]:{port_num}")
     server.start()
-    print("Server started")
+    log(f"Server started on port {port_num}...")
     try:
         while True:
             time.sleep(3600)
@@ -382,4 +390,5 @@ def serve():
 
 
 if __name__ == "__main__":
-    serve()
+    port_arg = sys.argv[1] if len(sys.argv) > 1 else 50051
+    serve(port_num=port_arg)
