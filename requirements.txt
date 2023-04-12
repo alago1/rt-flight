@@ -1,7 +1,6 @@
-exif==1.6.0
 geopy==2.3.0
-grpc==1.0.0
 grpcio==1.53.0
+grpcio-tools==1.53.0
 matplotlib==3.7.1
 mplcursors==0.5.2
 numpy==1.24.2
