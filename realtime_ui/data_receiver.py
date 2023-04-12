@@ -20,6 +20,8 @@ from matplotlib.figure import Figure
 import numpy as np
 from sklearn.cluster import DBSCAN
 
+from matplotlib import font_manager
+
 channel = grpc.insecure_channel('localhost:50051')
 stub = messaging_pb2_grpc.MessagingServiceStub(channel)
 
@@ -53,7 +55,12 @@ def show_waiting_text():
     waiting_img = Image.new('RGBA', (1024, 1024), (255, 255, 255, 255))
     draw = ImageDraw.Draw(waiting_img)
     text = "Waiting for coordinates..."
-    font = ImageFont.truetype("Helvetica", 24)
+
+    font = font_manager.FontProperties(family='sans-serif', weight='normal')
+    file = font_manager.findfont(font)
+    print(f"Selected font: {file}")
+
+    font = ImageFont.truetype(file, 24)
     text_width, text_height = draw.textsize(text, font)
     x = (waiting_img.width - text_width) // 2
     y = (waiting_img.height - text_height) // 2
