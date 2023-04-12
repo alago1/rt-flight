@@ -54,7 +54,7 @@ class ObjectDetectionLayer:
     def _get_bboxes_pixels(self, img_path):
         img = PIL.Image.open(img_path)
         img = np.array(img)
-        
+
         image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
         Height, Width = image.shape[:2]
@@ -140,10 +140,16 @@ class GPSTranslocationLayer:
 
         log(f"Metadata: {metadata}")
 
+        self.image_width = metadata["EXIF:ExifImageWidth"]
+        self.image_height = metadata["EXIF:ExifImageHeight"]
+
         self.latitude = metadata["EXIF:GPSLatitude"]
         self.longitude = metadata["EXIF:GPSLongitude"]
         self.altitude = metadata["EXIF:GPSAltitude"]
-        self.heading = metadata["EXIF:GPSImgDirection"]
+        self.heading = dict.get(metadata, "EXIF:GPSImgDirection", 0)
+
+        if self.heading == 0:
+            print("WARNING: Heading defaulted to 0. The program will continute to run, but this may cause issues.")
 
         if metadata["EXIF:GPSLatitudeRef"] == "S":
             assert self.latitude >= 0, "Latitude is negative but ref is S"
@@ -166,7 +172,7 @@ class GPSTranslocationLayer:
             1e-3,  # mm
             1e-6,  # um
         ]
-        unit_index = dict.get(metadata, "EXIF:FocalPlaneResolutionUnit", 0)
+        unit_index = dict.get(metadata, "EXIF:FocalPlaneResolutionUnit", 1) - 1
         resolution_conversion_factor = units_to_meter_conversion_factors[unit_index]
 
         assert (
@@ -365,10 +371,7 @@ class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
         self.buffer = []
 
     def GetBoundingBoxes(self, request, context):
-        try:
-            bboxes_pixels = obj_layer.run(request.path)
-        except Exception as e:
-            print(e)
+        bboxes_pixels = obj_layer.run(request.path)
 
         if len(bboxes_pixels) == 0:
             print("No detections found")
@@ -394,8 +397,8 @@ def serve(port_num):
     global obj_layer, gps_translation_layer
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    weights_file = "yolo/yolov3-aerial.weights"
-    config_file = "yolo/yolov3-aerial.cfg"
+    weights_file = "yolo/yolov3-tiny.weights"
+    config_file = "yolo/yolov3-tiny.cfg"
 
     log(
         f"Using detection model with weights from {weights_file} and config from {config_file}"
