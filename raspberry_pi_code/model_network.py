@@ -414,8 +414,8 @@ def serve(port_num):
         weights_file = "yolo/yolov3-tiny.weights"
         config_file = "yolo/yolov3-tiny.cfg"
     else:
-        weights_file = "yolo/yolov3.weights"
-        config_file = "yolo/yolov3.cfg"
+        weights_file = "yolo/yolov3-aerial.weights"
+        config_file = "yolo/yolov3-aerial.cfg"
 
     log(
         f"Using detection model with weights from {weights_file} and config from {config_file}"
