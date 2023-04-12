@@ -4,4 +4,10 @@ examples/mmrotate
 examples/ssdd_tiny/
 examples/ssdd_tiny.zip
 __pycache__
+
+# model weights and checkpoints
 weights/
+yolo/
+*.pth
+yolo.zip
+yolov3.h5
