@@ -2,8 +2,10 @@ import os
 import sys
 import time
 from concurrent import futures
+from contextlib import redirect_stdout
 
 import cv2
+import exiftool
 import geopy
 import geopy.distance
 import grpc
@@ -11,18 +13,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import PIL
 import smopy
-import exiftool
-from exif import Image as ExifImage
-from contextlib import redirect_stdout
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
 
 import messaging_pb2
 import messaging_pb2_grpc
 
+
 def log(message):
     global log_path
-    with open(log_path, 'a') as f:
+    with open(log_path, "a") as f:
         with redirect_stdout(f):
             print(message)
 
@@ -54,7 +54,7 @@ class ObjectDetectionLayer:
     def _get_bboxes_pixels(self, img_path):
         img = PIL.Image.open(img_path)
         img = np.array(img)
-
+        
         image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
         Height, Width = image.shape[:2]
@@ -135,34 +135,55 @@ class GPSTranslocationLayer:
     image_height = None
 
     def _load_metadata(self, image_path):
-        with open(image_path, 'rb') as image_file:
-            exif_img = ExifImage(image_file)
-        
-        img = PIL.Image.open(image_path)
-        self.image_width = img.width
-        self.image_height = img.height
-        img.close()    
-        
-        lat = exif_img.gps_latitude
-        lat = lat[0] + lat[1]/60 + lat[2]/3600
-        
-        lon = exif_img.gps_longitude
-        lon = lon[0] + lon[1]/60 + lon[2]/3600
-        
-        self.latitude = lat if exif_img.gps_latitude_ref == 'N' else -lat
-        self.longitude = lon if exif_img.gps_longitude_ref == 'E' else -lon
-        
-        self.altitude = exif_img.gps_altitude
-        
-        self.heading = exif_img.gps_img_direction if exif_img.gps_img_direction_ref == 'T' else exif_img.gps_img_direction + 8
-        
-        sensor_width = exif_img.focal_plane_x_resolution / 1000
-        sensor_height = exif_img.focal_plane_y_resolution / 1000
-        focal_length = exif_img.focal_length
+        with exiftool.ExifToolHelper() as et:
+            metadata = et.get_metadata(image_path)[0]
+
+        log(f"Metadata: {metadata}")
+
+        self.latitude = metadata["EXIF:GPSLatitude"]
+        self.longitude = metadata["EXIF:GPSLongitude"]
+        self.altitude = metadata["EXIF:GPSAltitude"]
+        self.heading = metadata["EXIF:GPSImgDirection"]
+
+        if metadata["EXIF:GPSLatitudeRef"] == "S":
+            assert self.latitude >= 0, "Latitude is negative but ref is S"
+            self.latitude *= -1
+
+        if metadata["EXIF:GPSLongitudeRef"] == "W":
+            assert self.longitude >= 0, "Longitude is negative but ref is W"
+            self.longitude *= -1
+
+        if metadata["EXIF:GPSImgDirectionRef"] == "M":
+            assert (
+                np.abs(self.heading) > 2 * np.pi
+            ), "Heading is in radians but we assume degrees. Please fix"
+            self.heading -= 8.0  # subtract 8deg to account for magnetic declination
+
+        units_to_meter_conversion_factors = [
+            None,  # this is the default value
+            0.0254,  # inches
+            1e-2,  # cm
+            1e-3,  # mm
+            1e-6,  # um
+        ]
+        unit_index = dict.get(metadata, "EXIF:FocalPlaneResolutionUnit", 0)
+        resolution_conversion_factor = units_to_meter_conversion_factors[unit_index]
+
+        assert (
+            resolution_conversion_factor is not None
+        ), "FocalPlaneResolutionUnit is None"
+
+        focal_length = metadata["EXIF:FocalLength"] * resolution_conversion_factor
+        sensor_width = (
+            metadata["EXIF:FocalPlaneXResolution"] * resolution_conversion_factor
+        )
+        sensor_height = (
+            metadata["EXIF:FocalPlaneYResolution"] * resolution_conversion_factor
+        )
 
         self.half_image_width_meters = self.altitude * sensor_width / focal_length
         self.half_image_height_meters = self.altitude * sensor_height / focal_length
-        
+
         log("*" * 75)
         log(f"Loaded metadata from image: {image_path}")
         log(f"Image dimensions:{self.image_width}, {self.image_height}")
@@ -176,9 +197,7 @@ class GPSTranslocationLayer:
     def _destination_point(self, start_lat, start_lon, bearing, distance):
         start_point = geopy.Point(start_lat, start_lon)
         distance = geopy.distance.distance(meters=distance)
-        destination_point = distance.destination(
-            point=start_point, bearing=bearing
-        ) 
+        destination_point = distance.destination(point=start_point, bearing=bearing)
         return destination_point.latitude, destination_point.longitude
 
     def _plot_corners_on_map(self, zoom=14):
@@ -281,7 +300,9 @@ class GPSTranslocationLayer:
         center_relative_position_pixel = (x - self.image_width, y - self.image_height)
 
         pixel_heading = (
-            self.heading + np.degrees(np.arctan2(*center_relative_position_pixel)) + 90  # this may be wrong :shrug:
+            self.heading
+            + np.degrees(np.arctan2(*center_relative_position_pixel))
+            + 90  # this may be wrong :shrug:
         )
 
         displacement_x_meters = (
@@ -344,9 +365,13 @@ class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
         self.buffer = []
 
     def GetBoundingBoxes(self, request, context):
-        bboxes_pixels = obj_layer.run(request.path)
+        try:
+            bboxes_pixels = obj_layer.run(request.path)
+        except Exception as e:
+            print(e)
 
         if len(bboxes_pixels) == 0:
+            print("No detections found")
             return messaging_pb2.BBoxes(bboxes=[])
 
         output = gps_translation_layer.run(request.path, bboxes_pixels)
@@ -360,6 +385,8 @@ class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
             )
             for bbox in output
         ]
+        print(f"Returning {len(bbox_list)} bboxes")
+
         return messaging_pb2.BBoxes(bboxes=bbox_list)
 
 
@@ -367,10 +394,12 @@ def serve(port_num):
     global obj_layer, gps_translation_layer
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    weights_file = "weights/yolov3-aerial.weights"
-    config_file = "weights/yolov3-aerial.cfg"
+    weights_file = "yolo/yolov3-aerial.weights"
+    config_file = "yolo/yolov3-aerial.cfg"
 
-    log(f"Using detection model with weights from {weights_file} and config from {config_file}")
+    log(
+        f"Using detection model with weights from {weights_file} and config from {config_file}"
+    )
 
     obj_layer = ObjectDetectionLayer(config_file=config_file, weights_file=weights_file)
 
@@ -391,7 +420,6 @@ def serve(port_num):
 
 if __name__ == "__main__":
     global log_path
-    port_arg = sys.argv[1] if len(sys.argv) > 1 else 50051
+    port_arg = sys.argv[1] if len(sys.argv) > 1 else 50951
     log_path = sys.argv[2] if len(sys.argv) > 2 else "logs.txt"
     serve(port_num=port_arg)
-
