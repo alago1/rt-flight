@@ -140,8 +140,16 @@ class GPSTranslocationLayer:
 
         log(f"Metadata: {metadata}")
 
-        self.image_width = metadata["EXIF:ExifImageWidth"]
-        self.image_height = metadata["EXIF:ExifImageHeight"]
+        self.image_width = (
+            dict.get(metadata, "EXIF:ExifImageWidth", None)
+            or dict.get(metadata, "EXIF:ImageWidth", None)
+            or dict.get(metadata, "File:ImageWidth")
+        )
+        self.image_height = (
+            dict.get(metadata, "EXIF:ExifImageHeight", None)
+            or dict.get(metadata, "EXIF:ImageHeight", None)
+            or dict.get(metadata, "File:ImageHeight")
+        )
 
         self.latitude = metadata["EXIF:GPSLatitude"]
         self.longitude = metadata["EXIF:GPSLongitude"]
@@ -149,7 +157,9 @@ class GPSTranslocationLayer:
         self.heading = dict.get(metadata, "EXIF:GPSImgDirection", 0)
 
         if self.heading == 0:
-            print("WARNING: Heading defaulted to 0. The program will continute to run, but this may cause issues.")
+            print(
+                "WARNING: Heading defaulted to 0. The program will continute to run, but this may cause issues."
+            )
 
         if metadata["EXIF:GPSLatitudeRef"] == "S":
             assert self.latitude >= 0, "Latitude is negative but ref is S"
@@ -397,8 +407,15 @@ def serve(port_num):
     global obj_layer, gps_translation_layer
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    weights_file = "yolo/yolov3-tiny.weights"
-    config_file = "yolo/yolov3-tiny.cfg"
+
+    using_tiny = False
+
+    if using_tiny:
+        weights_file = "yolo/yolov3-tiny.weights"
+        config_file = "yolo/yolov3-tiny.cfg"
+    else:
+        weights_file = "yolo/yolov3.weights"
+        config_file = "yolo/yolov3.cfg"
 
     log(
         f"Using detection model with weights from {weights_file} and config from {config_file}"
