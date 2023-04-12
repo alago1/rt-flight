@@ -1,0 +1,9 @@
+opencv-python
+pyexiftool
+geopy
+grpcio
+matplotlib
+smopy
+protobuf
+mplcursors
+scikit-learn
