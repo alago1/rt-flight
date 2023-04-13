@@ -106,6 +106,7 @@ class ObjectDetectionLayer:
             )
 
         # follows the format of x0, x1, y0, y1, confidence
+        # where x0, x1 are columns and y0, y1 are rows
         return np.array(bboxes_with_confidence).astype(int)
 
     def run(self, img_path):
@@ -169,36 +170,38 @@ class GPSTranslocationLayer:
             assert self.longitude >= 0, "Longitude is negative but ref is W"
             self.longitude *= -1
 
-        if metadata["EXIF:GPSImgDirectionRef"] == "M":
-            assert (
-                np.abs(self.heading) > 2 * np.pi
-            ), "Heading is in radians but we assume degrees. Please fix"
-            self.heading -= 8.0  # subtract 8deg to account for magnetic declination
+        # if metadata["EXIF:GPSImgDirectionRef"] == "M":
+        #     assert (
+        #         np.abs(self.heading) > 2 * np.pi
+        #     ), "Heading is in radians but we assume degrees. Please fix"
+        #     self.heading -= 8.0  # subtract 8deg to account for magnetic declination
 
-        units_to_meter_conversion_factors = [
-            None,  # this is the default value
-            0.0254,  # inches
-            1e-2,  # cm
-            1e-3,  # mm
-            1e-6,  # um
-        ]
-        unit_index = dict.get(metadata, "EXIF:FocalPlaneResolutionUnit", 1) - 1
-        resolution_conversion_factor = units_to_meter_conversion_factors[unit_index]
+        # units_to_meter_conversion_factors = [
+        #     None,  # this is the default value
+        #     0.0254,  # inches
+        #     1e-2,  # cm
+        #     1e-3,  # mm
+        #     1e-6,  # um
+        # ]
+        # unit_index = dict.get(metadata, "EXIF:FocalPlaneResolutionUnit", 1) - 1
+        # resolution_conversion_factor = units_to_meter_conversion_factors[unit_index]
 
-        assert (
-            resolution_conversion_factor is not None
-        ), "FocalPlaneResolutionUnit is None"
+        # assert (
+        #     resolution_conversion_factor is not None
+        # ), "FocalPlaneResolutionUnit is None"
 
-        focal_length = metadata["EXIF:FocalLength"] * resolution_conversion_factor
-        sensor_width = (
-            metadata["EXIF:FocalPlaneXResolution"] * resolution_conversion_factor
-        )
-        sensor_height = (
-            metadata["EXIF:FocalPlaneYResolution"] * resolution_conversion_factor
-        )
+        # focal_length = metadata["EXIF:FocalLength"] * resolution_conversion_factor
+        # sensor_width = (
+        #     metadata["EXIF:FocalPlaneXResolution"] * resolution_conversion_factor
+        # )
+        # sensor_height = (
+        #     metadata["EXIF:FocalPlaneYResolution"] * resolution_conversion_factor
+        # )
 
-        self.half_image_width_meters = self.altitude * sensor_width / focal_length
-        self.half_image_height_meters = self.altitude * sensor_height / focal_length
+        # self.half_image_width_meters = self.altitude * sensor_width / focal_length
+        # self.half_image_height_meters = self.altitude * sensor_height / focal_length
+        self.half_image_width_meters = 23.8107
+        self.half_image_height_meters = 17.5875
 
         log("*" * 75)
         log(f"Loaded metadata from image: {image_path}")
@@ -317,7 +320,7 @@ class GPSTranslocationLayer:
 
         pixel_heading = (
             self.heading
-            + np.degrees(np.arctan2(*center_relative_position_pixel))
+            + np.degrees(np.arctan2(*center_relative_position_pixel[::-1]))
             + 90  # this may be wrong :shrug:
         )
 
@@ -341,14 +344,14 @@ class GPSTranslocationLayer:
         )
 
     def _bbox_pixels_to_center_gps(self, bbox_pixels):
-        x_min, x_max, y_min, y_max = bbox_pixels  # x: rows, y: cols
+        y_min, y_max, x_min, x_max = bbox_pixels  # x: cols, y: rows
 
-        bbox_center = (x_min + x_max) / 2, (y_min + y_max) / 2
+        bbox_center = (y_min + y_max) / 2, (x_min + x_max) / 2
         return self._pixel_to_gps(bbox_center)
 
     def _get_radius_of_bbox_in_meters(self, bbox_pixels):
-        x_min, x_max, y_min, y_max = bbox_pixels  # x: rows, y: cols
-        axis_length_pixels = (x_max - x_min) / 2, (y_max - y_min) / 2
+        y_min, y_max, x_min, x_max = bbox_pixels  # x: cols, y: rows
+        axis_length_pixels = (y_max - y_min) / 2, (x_max - x_min) / 2
         axis_length_meters = (
             axis_length_pixels[0]
             / self.image_height
