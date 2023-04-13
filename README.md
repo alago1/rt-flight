@@ -14,14 +14,20 @@ You may want to add a `/data` folder at the root with the appropriate images. Th
 
 ### **Install Dependencies**
 
+OS: Ubuntu 22.04.2
+Python version: 3.10.6
 
 ```
 pip install -r 'requirements.txt'
 
-//placeholder for apt-get command
+apt install libimage-exiftool-perl
+apt install python3-tk
+apt install libgl1
+apt install libglib2.0-0
 ```
 
 ***
+
 
 ## Using the Simulator
 
