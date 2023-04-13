@@ -8,16 +8,52 @@
 - [Tom Liraz](https://github.com/tomliraz)
 - [Tyler J. Schultz](https://github.com/tj-schultz)
 
-## Before using
+## General File Structure
+```
+root/
+├── data/  # Data for the simulator
+    ├── Blore_Clean.jpg
+    └── ...
+├── yolo/  # Model weights and config
+    ├── yolov3-aerial.cfg
+    ├── yolov3-aerial.weights
+    └── ...
+├── examples/  # Runnable examples
+    ├── model_sender.ipynb
+    ├── file_sender.py
+    └── ...
+├── raspberry_pi_code/  # Code usable in a Raspberry Pi
+    ├── model_network.py
+    ├── file_sender.py
+    ├── protos/  # Protobuf files
+    │   ├── messaging.proto
+    │   └── ...
+    └── ...
+├── realtime_ui/  # Code for the UI
+    ├── data_receiver.py
+    ├── network.py
+    ├── protos/  # Protobuf files
+    │   ├── messaging.proto
+    │   └── ...
+    └── ...
+├── requirements.txt
+└── ...
+```
 
-You may want to add a `/data` folder at the root with the appropriate images. The model_sender notebook makes use of the Blore_Clean geotiff image which can be found [here](https://drive.google.com/file/d/14mJcI-_crVwy95-pAr1K8nYJDyK99zh5/view?usp=share_link). Additionally, we make the use of YoloV3 Darknet as the detection model for our simulation. The weights for these models can be found here [here](https://github.com/jekhor/darknet) in the readme. You may also want to add a `/weights` folder in the `/raspberry_pi_code` directory and add in the "yolov3-aerial.weights" and "yolov3-aerial.cfg" files.
+## Setup before using
+You may want to the `/data` folder at the root with the appropriate images. The model_sender notebook makes use of the Blore_Clean geotiff image which can be found [here](https://drive.google.com/file/d/14mJcI-_crVwy95-pAr1K8nYJDyK99zh5/view?usp=share_link). Additionally, we make the use of [YoloV3 Darknet](https://github.com/jekhor/darknet) fine-tuned to aerial imagery as the detection model for our simulation.
+
+The weights for these models can be found here [here](https://drive.google.com/file/d/1LyWvsoPmmPM9is0TmDmCE5vddXZLXYK6/view?usp=share_link). Add them to the `yolo/` folder in the root directory. We require "yolov3-aerial.weights" and "yolov3-aerial.cfg" (provided) files.
+
+If you're using a different model (for instance [YoloV3-tiny](https://github.com/smarthomefans/darknet-test) on low-memory devices), please add the weights and config files
+to the `yolo/` folder and change the appropriate variables in the `model_sender.ipynb` and `model_network.py`.
 
 ### **Install Dependencies**
 
-OS: Ubuntu 22.04.2
+OS: Ubuntu 22.04.2.
 Python version: 3.10.6
 
-```
+```bash
 pip install -r 'requirements.txt'
 
 apt install libimage-exiftool-perl
@@ -31,12 +67,12 @@ apt install libglib2.0-0
 
 ## Using the Simulator
 
-Running the simulation requires a specific order in which to launch the programs in. The network.py script acts as an intermediary that emulates the transmission of a detection via Mavlink to the Ground Station and to the UI. As such, network.py would be started first, followed by data_reciever.py to start up the UI. Finally, the model_sender.ipynb notebook will be run. 
+Running the simulation requires a specific order in which to launch the programs in. The network.py script acts as an intermediary that emulates the transmission of a detection via Mavlink to the Ground Station and to the UI. As such, network.py would be started first, followed by data_receiver.py to start up the UI. Finally, the model_sender.ipynb notebook will be run. 
 
 
 ### **Start the Network**
 
-```
+```bash
 python realtime_ui/network.py
 ```
 
@@ -44,7 +80,7 @@ python realtime_ui/network.py
 
 Create a new terminal/command line instance to launch the UI. 
 
-```
+```bash
 python realtime_ui/data_receiver.py
 ```
 
@@ -55,10 +91,10 @@ While we don't have a great way to run a Jupyter notebook from command line, the
 
 ### **Example Run for Simulator**
 
-```
-#in one terminal instance
+```bash
+# in one terminal instance
 python realtime_ui/network.py
-#in another terminal instance
+# in another terminal instance
 python realtime_ui/data_receiver.py
 
 # once both are running, run the full model_sender.ipynb notebook
@@ -74,7 +110,7 @@ This is the code within the `/raspberry_pi_code` directory that serves as a work
 
 Similarly to the simulator, model_network.py works like network.py, with the difference being that it awaits a file path input from the use in the form of a procedure call, then runs the detection model on it and sends back the corresponding coordinates and information. By default, this server will be running on port 50051, and the log file location will be in the same directory as model_network.py named "log.txt".
 
-```
+```bash
 python raspberry_pi_code/model_network <port number; default = 50051> <log file path; default = "log.txt">
 ```
 
@@ -112,7 +148,3 @@ Graceful termination has not been properly integrated into network.py nor model_
 
 
 ***
-
-## Known Bugs
-
-Currently, the radius value that is returned from the GPSTranslocationLayer in the raspberry_pi_code/model_network.py program is inaccurate, as it overshoots the known-value consistently.

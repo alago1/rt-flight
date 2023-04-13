@@ -1,13 +1,15 @@
-data/
+data_ignore/
 examples/mmdetection/
 examples/mmrotate
 examples/ssdd_tiny/
 examples/ssdd_tiny.zip
 __pycache__
+logs.txt
+
+.vscode/
 
 # model weights and checkpoints
 weights/
-yolo/
 *.pth
 yolo.zip
 yolov3.h5

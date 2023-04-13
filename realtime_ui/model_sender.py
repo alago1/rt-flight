@@ -410,9 +410,9 @@ if __name__ == "__main__":
     plt.imshow(pathtrace, cmap="gray")
     plt.show(block=False)
 
-    weights_file = "../raspberry_pi_code/weights/yolov3-aerial.weights"
-    classes_file = "../raspberry_pi_code/weights/aerial.names"
-    config_file = "../raspberry_pi_code/weights/yolov3-aerial.cfg"
+    weights_file = "../yolo/yolov3-aerial.weights"
+    classes_file = "../yolo/aerial.names"
+    config_file = "../yolo/yolov3-aerial.cfg"
 
     obj_layer = ObjectDetectionLayer(
         config_file=config_file, weights_file=weights_file, classes_file=classes_file
