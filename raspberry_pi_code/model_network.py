@@ -170,38 +170,38 @@ class GPSTranslocationLayer:
             assert self.longitude >= 0, "Longitude is negative but ref is W"
             self.longitude *= -1
 
-        # if metadata["EXIF:GPSImgDirectionRef"] == "M":
-        #     assert (
-        #         np.abs(self.heading) > 2 * np.pi
-        #     ), "Heading is in radians but we assume degrees. Please fix"
-        #     self.heading -= 8.0  # subtract 8deg to account for magnetic declination
+        if metadata["EXIF:GPSImgDirectionRef"] == "M":
+            assert (
+                np.abs(self.heading) > 2 * np.pi
+            ), "Heading is in radians but we assume degrees. Please fix"
+            self.heading -= 8.0  # subtract 8deg to account for magnetic declination
 
-        # units_to_meter_conversion_factors = [
-        #     None,  # this is the default value
-        #     0.0254,  # inches
-        #     1e-2,  # cm
-        #     1e-3,  # mm
-        #     1e-6,  # um
-        # ]
-        # unit_index = dict.get(metadata, "EXIF:FocalPlaneResolutionUnit", 1) - 1
-        # resolution_conversion_factor = units_to_meter_conversion_factors[unit_index]
+        units_to_meter_conversion_factors = [
+            None,  # this is the default value
+            0.0254,  # inches
+            1e-2,  # cm
+            1e-3,  # mm
+            1e-6,  # um
+        ]
+        unit_index = dict.get(metadata, "EXIF:FocalPlaneResolutionUnit", 1) - 1
+        resolution_conversion_factor = units_to_meter_conversion_factors[unit_index]
 
-        # assert (
-        #     resolution_conversion_factor is not None
-        # ), "FocalPlaneResolutionUnit is None"
+        assert (
+            resolution_conversion_factor is not None
+        ), "FocalPlaneResolutionUnit is None"
 
-        # focal_length = metadata["EXIF:FocalLength"] * resolution_conversion_factor
-        # sensor_width = (
-        #     metadata["EXIF:FocalPlaneXResolution"] * resolution_conversion_factor
-        # )
-        # sensor_height = (
-        #     metadata["EXIF:FocalPlaneYResolution"] * resolution_conversion_factor
-        # )
+        focal_length = metadata["EXIF:FocalLength"] * resolution_conversion_factor
+        sensor_width = (
+            metadata["EXIF:FocalPlaneXResolution"] * resolution_conversion_factor
+        )
+        sensor_height = (
+            metadata["EXIF:FocalPlaneYResolution"] * resolution_conversion_factor
+        )
 
-        # self.half_image_width_meters = self.altitude * sensor_width / focal_length
-        # self.half_image_height_meters = self.altitude * sensor_height / focal_length
-        self.half_image_width_meters = 23.8107
-        self.half_image_height_meters = 17.5875
+        self.half_image_width_meters = self.altitude * sensor_width / focal_length
+        self.half_image_height_meters = self.altitude * sensor_height / focal_length
+        # self.half_image_width_meters = 23.8107
+        # self.half_image_height_meters = 17.5875
 
         log("*" * 75)
         log(f"Loaded metadata from image: {image_path}")
