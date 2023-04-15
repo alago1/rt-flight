@@ -136,7 +136,7 @@ class GPSTranslocationLayer:
     image_height = None
 
     def _load_metadata(self, image_path):
-        with exiftool.ExifToolHelper() as et:
+        with exiftool.ExifTooHelperl() as et:
             metadata = et.get_metadata(image_path)[0]
 
         log(f"Metadata: {metadata}")
