@@ -10,7 +10,7 @@ def run(port_num):
     stub = messaging_pb2_grpc.MessagingServiceStub(channel)
     # img_path = "usable_RGB.jpg"
     # img_path = "2023-04-11_21-59-12_IR.tiff"
-    img_path = "2023-04-09_19-58-14_RGB.jpg" # has GPSDirection
+    img_path = "data/dota_demo.jpg" # has GPSDirection
 
     out = stub.GetBoundingBoxes(messaging_pb2.File_Payload(path=img_path))
     print(out.bboxes)
