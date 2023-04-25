@@ -200,8 +200,6 @@ class GPSTranslocationLayer:
 
         self.half_image_width_meters = self.altitude * sensor_width / focal_length
         self.half_image_height_meters = self.altitude * sensor_height / focal_length
-        # self.half_image_width_meters = 23.8107
-        # self.half_image_height_meters = 17.5875
 
         log("*" * 75)
         log(f"Loaded metadata from image: {image_path}")
