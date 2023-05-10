@@ -33,7 +33,6 @@ class ImageProcessingLayer:
         self.mock_wait_time = mock_wait_time
 
         if mock_image_path is None:
-            # mock_image_path = "data/demo.jpg"
             mock_image_path = "../data/demo.jpg"
 
         self._mock_img_full = np.asarray(Image.open(mock_image_path))[:, :, :3]
@@ -357,31 +356,6 @@ class MavlinkInterfaceLayer:
             responses.append(response)
 
         return responses
-    
-    
-# lat_center = 29.643946
-# lon_center = -82.355659
-
-# lat_mile = 0.0144927536231884
-# lon_mile = 0.0181818181818182
-# lat_min = lat_center - (15 * lat_mile)
-# lat_max = lat_center + (15 * lat_mile)
-# lon_min = lon_center - (15 * lon_mile)
-# lon_max = lon_center + (15 * lon_mile)
-
-# DATASET_TOP_LEFT_GPS = np.array((lat_min, lon_min))
-# DATASET_TOP_RIGHT_GPS = np.array((lat_max, lon_min))
-# DATASET_BOT_LEFT_GPS = np.array((lat_min, lon_max))
-# DATASET_BOT_RIGHT_GPS = np.array((lat_max, lon_max))
-
-# DATASET_CORNER_GPS_COORDS = np.array(
-#     [
-#         DATASET_TOP_LEFT_GPS,
-#         DATASET_TOP_RIGHT_GPS,
-#         DATASET_BOT_LEFT_GPS,
-#         DATASET_BOT_RIGHT_GPS,
-#     ]
-# )
 
 if __name__ == "__main__":
 
@@ -390,9 +364,6 @@ if __name__ == "__main__":
     DATASET_BOT_LEFT_GPS = np.array((12.859008245256549, 77.5151541499705))
     DATASET_BOT_RIGHT_GPS = np.array((12.858936436333265, 77.52262951527761))
     DATASET_CORNER_GPS_COORDS = np.array([DATASET_TOP_LEFT_GPS, DATASET_TOP_RIGHT_GPS, DATASET_BOT_LEFT_GPS, DATASET_BOT_RIGHT_GPS])
-
-
-    # np.random.seed(40)
 
     mock_image_path = "../realtime_ui/data/Copy of Blore_Clean.tif"
 
