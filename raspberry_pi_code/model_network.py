@@ -175,7 +175,7 @@ class GPSTranslocationLayer:
                 np.abs(self.heading) > 2 * np.pi
             ), "Heading is in radians but we assume degrees. Please fix"
             self.heading -= 8.0  # subtract 8deg to account for magnetic declination
-
+        
         units_to_meter_conversion_factors = [
             None,  # this is the default value
             0.0254,  # inches
@@ -249,8 +249,8 @@ class GPSTranslocationLayer:
         plt.figure(figsize=(10, 10))
         plt.imshow(_map.img)
         plt.scatter(
-            [x_top_left, x_top_right, x_bottom_right, x_bottom_left, x_top_left],
-            [y_top_left, y_top_right, y_bottom_right, y_bottom_left, y_top_left],
+            [x_top_left, x_top_right, x_bottom_right, x_bottom_left],
+            [y_top_left, y_top_right, y_bottom_right, y_bottom_left],
         )
         plt.scatter(
             [det_lat, det_lat],
@@ -268,28 +268,24 @@ class GPSTranslocationLayer:
         # Calculate the bearings from the center to the corners
         bearing_top_right = (
             self.heading
-            - 180
             + np.degrees(
                 np.arctan2(self.half_image_height_meters, self.half_image_width_meters)
             )
         ) % 360
-        bearing_top_left = (
+        bearing_bottom_right = (
             self.heading
-            - 180
             + np.degrees(
                 np.arctan2(self.half_image_height_meters, -self.half_image_width_meters)
             )
         ) % 360
-        bearing_bottom_right = (
+        bearing_top_left = (
             self.heading
-            - 180
             + np.degrees(
                 np.arctan2(-self.half_image_height_meters, self.half_image_width_meters)
             )
         ) % 360
         bearing_bottom_left = (
             self.heading
-            - 180
             + np.degrees(
                 np.arctan2(
                     -self.half_image_height_meters, -self.half_image_width_meters
@@ -314,7 +310,7 @@ class GPSTranslocationLayer:
     def _pixel_to_gps(self, pixel):
         x, y = pixel
 
-        center_relative_position_pixel = (x - self.image_width, y - self.image_height)
+        center_relative_position_pixel = (x - self.image_width / 2, y - self.image_height / 2)
 
         pixel_heading = (
             self.heading
