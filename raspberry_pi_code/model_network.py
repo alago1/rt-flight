@@ -5,7 +5,7 @@ from concurrent import futures
 from contextlib import redirect_stdout
 import traceback
 
-import cv2
+# import cv2
 import tflite_runtime.interpreter as tflite
 import exiftool
 import geopy
@@ -41,7 +41,7 @@ class ObjectDetectionLayer:
         self.classes = ["car", "truck", "bus", "minibus", "cyclist"]
 
     def _load_model(self):
-        model = tflite.Interpreter(self.model_path)
+        model = tflite.Interpreter(self.model_path, num_threads=4)
         return model
     
     def _get_bboxes_pixels(self, img_path):
