@@ -1,25 +1,21 @@
-import os
-import sys
 import time
 from concurrent import futures
 from contextlib import redirect_stdout
 import traceback
 
-# import cv2
 import tflite_runtime.interpreter as tflite
 import exiftool
 import geopy
 import geopy.distance
-import grpc
+
 import matplotlib.pyplot as plt
 import numpy as np
 import PIL
 import smopy
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
-
-import messaging_pb2
-import messaging_pb2_grpc
+# from dataclasses import dataclass
+import zmq
+from bbox import BBox
 
 import yolo_util as YoloUtil
 
@@ -43,7 +39,7 @@ class ObjectDetectionLayer:
     def _load_model(self):
         model = tflite.Interpreter(self.model_path, num_threads=4)
         return model
-    
+
     def _get_bboxes_pixels(self, img_path):
         self.net.allocate_tensors()
         _, height, width, _ = self.net.get_input_details()[0]["shape"]
@@ -57,18 +53,30 @@ class ObjectDetectionLayer:
 
         self.net.invoke()
         output_details = self.net.get_output_details()
-        predictions = [self.net.get_tensor(output_details[i]["index"]) for i in range(len(output_details))]
+        predictions = [
+            self.net.get_tensor(output_details[i]["index"])
+            for i in range(len(output_details))
+        ]
 
         predictions.sort(key=lambda x: x.shape[1])
 
         boxes = []
         for i in range(len(predictions)):
             # boxes.append(self._decode_yolo_boxes(predictions[i][0], anchors[i], (height, width), img_pil.size))
-            boxes.append(YoloUtil.decode_net_output(predictions[i], YoloUtil.v3_anchors[YoloUtil.v3_anchor_mask[i]], 20, (height, width)))
+            boxes.append(
+                YoloUtil.decode_net_output(
+                    predictions[i],
+                    YoloUtil.v3_anchors[YoloUtil.v3_anchor_mask[i]],
+                    20,
+                    (height, width),
+                )
+            )
 
         boxes = np.concatenate(boxes, axis=1)
         boxes = YoloUtil.correct_boxes(boxes, img_pil.size[::-1], (height, width))
-        boxes, _, scores = YoloUtil.handle_predictions(boxes, 20, confidence=self.min_confidence)
+        boxes, _, scores = YoloUtil.handle_predictions(
+            boxes, 20, confidence=self.min_confidence
+        )
 
         # changes format from (x, y, w, h) to (x0, y0, x1, y1)
         boxes = YoloUtil.adjust_boxes(boxes, img_pil.size[::-1])
@@ -77,7 +85,7 @@ class ObjectDetectionLayer:
         boxes = boxes[:, [0, 2, 1, 3]]
 
         # append confidence to each data point
-        boxes = np.concatenate((boxes, 100*scores.reshape(-1, 1)), axis=1).astype(int)
+        boxes = np.concatenate((boxes, 100 * scores.reshape(-1, 1)), axis=1).astype(int)
 
         # follows the format of x0, x1, y0, y1, confidence
         # where x0, x1 are columns and y0, y1 are rows
@@ -149,7 +157,7 @@ class GPSTranslocationLayer:
                 np.abs(self.heading) > 2 * np.pi
             ), "Heading is in radians but we assume degrees. Please fix"
             self.heading -= 8.0  # subtract 8deg to account for magnetic declination
-        
+
         units_to_meter_conversion_factors = [
             None,  # this is the default value
             0.0254,  # inches
@@ -284,7 +292,10 @@ class GPSTranslocationLayer:
     def _pixel_to_gps(self, pixel):
         x, y = pixel
 
-        center_relative_position_pixel = (x - self.image_width / 2, y - self.image_height / 2)
+        center_relative_position_pixel = (
+            x - self.image_width / 2,
+            y - self.image_height / 2,
+        )
 
         pixel_heading = (
             self.heading
@@ -347,68 +358,59 @@ class GPSTranslocationLayer:
         ]
 
 
-class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
-    def __init__(self):
-        self.buffer = []
+def GetBoundingBoxes(path):
+    try:
+        bboxes_pixels = obj_layer.run(path)
 
-    def GetBoundingBoxes(self, request, context):
-        try:   
-            bboxes_pixels = obj_layer.run(request.path)
+        if len(bboxes_pixels) == 0:
+            print("No detections found")
+            return []
 
-            if len(bboxes_pixels) == 0:
-                print("No detections found")
-                return messaging_pb2.BBoxes(bboxes=[])
+        output = gps_translation_layer.run(path, bboxes_pixels)
 
-            output = gps_translation_layer.run(request.path, bboxes_pixels)
+        bbox_list = [
+            BBox(
+                latitude=bbox[0], longitude=bbox[1], radius=bbox[2], confidence=bbox[3]
+            )
+            for bbox in output
+        ]
+        print(f"Returning {len(bbox_list)} bboxes")
 
-            bbox_list = [
-                messaging_pb2.BBox(
-                    latitude=bbox[0],
-                    longitude=bbox[1],
-                    radius=bbox[2],
-                    confidence=bbox[3],
-                )
-                for bbox in output
-            ]
-            print(f"Returning {len(bbox_list)} bboxes")
-        except Exception as e:
-            print(traceback.format_exc())
-            log(traceback.format_exc())
-            raise e
-        
-        return messaging_pb2.BBoxes(bboxes=bbox_list)
+    except Exception as e:
+        print(traceback.format_exc())
+        log(traceback.format_exc())
+        raise e
 
+    return bbox_list
 
-def serve(port_num):
-    global obj_layer, gps_translation_layer
+if __name__ == "__main__":
+    context = zmq.Context()
+    socket = context.socket(zmq.REP)
+    socket.bind("tcp://*:5555")
 
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    global log_path
+    log_path = "logs.txt"
 
-    model_path = "yolo/yolov3-aerial-latest.tflite"
+    global obj_layer, gsp_translation_layer
+
+    model_path = "../yolo/yolov3-aerial-latest.tflite"
 
     obj_layer = ObjectDetectionLayer(model_path=model_path)
-
-    log(
-        f"Using detection model loaded from {model_path}"
-    )
+    log(f"Using detection model loaded from {model_path}")
 
     gps_translation_layer = GPSTranslocationLayer()
 
-    messaging_pb2_grpc.add_MessagingServiceServicer_to_server(
-        MessagingService(), server
-    )
-    server.add_insecure_port(f"[::]:{port_num}")
-    server.start()
-    log(f"Server started on port {port_num}...")
     try:
         while True:
-            time.sleep(3600)
+            message = socket.recv()  # Should obtain message which is path of new image
+            
+            # TODO: Check if path is a valid image
+            try:
+                bboxes = GetBoundingBoxes(message.decode("utf-8"))
+
+                socket.send_pyobj(bboxes)
+            except:
+                pass
+
     except KeyboardInterrupt:
-        server.stop(0)
-
-
-if __name__ == "__main__":
-    global log_path
-    port_arg = sys.argv[1] if len(sys.argv) > 1 else 50951
-    log_path = sys.argv[2] if len(sys.argv) > 2 else "logs.txt"
-    serve(port_num=port_arg)
+        pass

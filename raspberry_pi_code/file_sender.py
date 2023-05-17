@@ -1,17 +1,21 @@
-import grpc
-import os, sys
+import zmq
+from bbox import BBox
+import pickle
+import io
+from pprint import pprint
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
-import messaging_pb2
-import messaging_pb2_grpc
+context = zmq.Context()
 
-def run(port_num):
-    channel = grpc.insecure_channel(f'localhost:{port_num}')
-    stub = messaging_pb2_grpc.MessagingServiceStub(channel)
-    img_path = "2023-04-09_19-58-14_RGB.jpg" # has GPSDirection
+#  Socket to talk to server
+print("Connecting to Model Network")
+socket = context.socket(zmq.REQ)
+socket.connect("tcp://localhost:5555")
 
-    out = stub.GetBoundingBoxes(messaging_pb2.File_Payload(path=img_path))
-    print(out.bboxes)
-if __name__ == '__main__':
-    port_arg = sys.argv[1] if len(sys.argv) > 1 else 50951
-    run(port_num=port_arg)
+img_path = "../data/dota_demo.jpg"
+
+socket.send_string(img_path)
+message = socket.recv()
+
+arr = pickle.load(io.BytesIO(message))
+
+pprint(arr)
