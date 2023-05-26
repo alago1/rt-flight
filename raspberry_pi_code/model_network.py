@@ -5,8 +5,6 @@ from concurrent import futures
 from contextlib import redirect_stdout
 import traceback
 
-# import cv2
-import tflite_runtime.interpreter as tflite
 import exiftool
 import geopy
 import geopy.distance
@@ -22,10 +20,17 @@ import messaging_pb2
 import messaging_pb2_grpc
 
 import yolo_util as YoloUtil
+from engines.engine import EngineLoader
 
 
 def log(message):
     global log_path
+
+    try:
+        log_path
+    except NameError:
+        log_path = 'logs.txt'
+
     with open(log_path, "a") as f:
         with redirect_stdout(f):
             print(message)
@@ -33,32 +38,28 @@ def log(message):
 
 class ObjectDetectionLayer:
     def __init__(self, model_path=None, min_confidence=0.3):
+        start = time.monotonic()
+
         self.model_path = model_path
 
-        self.net = self._load_model()
+        # self.net = EngineLoader.load(self.model_path, engine='onnx', providers=[('CUDAExecutionProvider')])
+        self.net = EngineLoader.load(self.model_path, engine='tensorrt')
         self.min_confidence = min_confidence
 
-        self.classes = ["car", "truck", "bus", "minibus", "cyclist"]
+        elapsed = time.monotonic() - start
+        print(f'[Object Detection Layer] INFO: Finished loading in {elapsed:.4f}s')
 
-    def _load_model(self):
-        model = tflite.Interpreter(self.model_path, num_threads=4)
-        return model
-    
+
     def _get_bboxes_pixels(self, img_path):
-        self.net.allocate_tensors()
-        _, height, width, _ = self.net.get_input_details()[0]["shape"]
+        start = time.monotonic()
+
+        height, width = self.net.get_input_shape()
 
         # load and preprocess image
         img_pil = PIL.Image.open(img_path)
         img = YoloUtil.preprocess_image(img_pil, (height, width))
 
-        tensor_index = self.net.get_input_details()[0]["index"]
-        self.net.set_tensor(tensor_index, img)
-
-        self.net.invoke()
-        output_details = self.net.get_output_details()
-        predictions = [self.net.get_tensor(output_details[i]["index"]) for i in range(len(output_details))]
-
+        predictions = self.net(img)
         predictions.sort(key=lambda x: x.shape[1])
 
         boxes = []
@@ -375,7 +376,7 @@ class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
             print(traceback.format_exc())
             log(traceback.format_exc())
             raise e
-        
+
         return messaging_pb2.BBoxes(bboxes=bbox_list)
 
 
@@ -384,7 +385,8 @@ def serve(port_num):
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
 
-    model_path = "yolo/yolov3-aerial-latest.tflite"
+    # model_path = "../yolo/yolov3-416.onnx"
+    model_path = "../yolo/yolov3-416.trt"
 
     obj_layer = ObjectDetectionLayer(model_path=model_path)
 
