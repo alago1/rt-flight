@@ -3,8 +3,8 @@ import sys
 import time
 from concurrent import futures
 from contextlib import redirect_stdout
+import traceback
 
-import cv2
 import exiftool
 import geopy
 import geopy.distance
@@ -19,95 +19,70 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
 import messaging_pb2
 import messaging_pb2_grpc
 
+import yolo_util as YoloUtil
+from engines.engine import EngineLoader
+
 
 def log(message):
     global log_path
+
+    try:
+        log_path
+    except NameError:
+        log_path = 'logs.txt'
+
     with open(log_path, "a") as f:
         with redirect_stdout(f):
             print(message)
 
 
 class ObjectDetectionLayer:
-    def __init__(self, weights_file=None, config_file=None, min_confidence=0.3):
-        self.weights_file = weights_file
-        self.config_file = config_file
+    def __init__(self, model_path=None, min_confidence=0.3):
+        start = time.monotonic()
 
-        self.net = self._load_model()
+        self.model_path = model_path
+
+        # self.net = EngineLoader.load(self.model_path, engine='onnx', providers=[('CUDAExecutionProvider')])
+        self.net = EngineLoader.load(self.model_path, engine='tensorrt')
         self.min_confidence = min_confidence
 
-        self.classes = ["car", "truck", "bus", "minibus", "cyclist"]
+        elapsed = time.monotonic() - start
+        print(f'[Object Detection Layer] INFO: Finished loading in {elapsed:.4f}s')
 
-    def _load_model(self):
-        return cv2.dnn.readNet(self.weights_file, self.config_file)
-
-    def _get_output_layers(self, net):
-        layer_names = net.getLayerNames()
-        try:
-            output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
-        except Exception:
-            output_layers = [
-                layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()
-            ]
-
-        return output_layers
 
     def _get_bboxes_pixels(self, img_path):
-        img = PIL.Image.open(img_path)
-        img = np.array(img)
+        start = time.monotonic()
 
-        image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        height, width = self.net.get_input_shape()
 
-        Height, Width = image.shape[:2]
-        scale = 0.00392
+        # load and preprocess image
+        img_pil = PIL.Image.open(img_path)
+        img = YoloUtil.preprocess_image(img_pil, (height, width))
 
-        blob = cv2.dnn.blobFromImage(
-            image, scale, (416, 416), (0, 0, 0), True, crop=False
-        )
+        predictions = self.net(img)
+        predictions.sort(key=lambda x: x.shape[1])
 
-        self.net.setInput(blob)
-
-        outs = self.net.forward(self._get_output_layers(self.net))
-
-        class_ids = []
-        confidences = []
         boxes = []
-        conf_threshold = 0.5
-        nms_threshold = 0.4
+        for i in range(len(predictions)):
+            # boxes.append(self._decode_yolo_boxes(predictions[i][0], anchors[i], (height, width), img_pil.size))
+            boxes.append(YoloUtil.decode_net_output(predictions[i], YoloUtil.v3_anchors[YoloUtil.v3_anchor_mask[i]], 20, (height, width)))
 
-        for out in outs:
-            for detection in out:
-                scores = detection[5:]
-                class_id = np.argmax(scores)
-                confidence = scores[class_id]
-                if confidence > self.min_confidence:
-                    center_x = int(detection[0] * Width)
-                    center_y = int(detection[1] * Height)
-                    w = int(detection[2] * Width)
-                    h = int(detection[3] * Height)
-                    x = center_x - w / 2
-                    y = center_y - h / 2
-                    class_ids.append(class_id)
-                    confidences.append(float(confidence))
-                    boxes.append([x, y, w, h])
+        boxes = np.concatenate(boxes, axis=1)
+        boxes = YoloUtil.correct_boxes(boxes, img_pil.size[::-1], (height, width))
+        boxes, _, scores = YoloUtil.handle_predictions(boxes, 20, confidence=self.min_confidence)
 
-        indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_threshold, nms_threshold)
+        # changes format from (x, y, w, h) to (x0, y0, x1, y1)
+        boxes = YoloUtil.adjust_boxes(boxes, img_pil.size[::-1])
 
-        bboxes_with_confidence = []
-        for i in indices:
-            try:
-                box = boxes[i]
-            except:
-                box = boxes[i[0]]
+        # change to (x0, x1, y0, y1)
+        boxes = boxes[:, [0, 2, 1, 3]]
 
-            x, y, w, h = [max(v, 0) for v in box[:4]]  # model outputs can be negative
-
-            bboxes_with_confidence.append(
-                np.array((x, x + w, y, y + h, 100 * confidences[i]))
-            )
+        # append confidence to each data point
+        boxes = np.concatenate((boxes, 100*scores.reshape(-1, 1)), axis=1).astype(int)
 
         # follows the format of x0, x1, y0, y1, confidence
         # where x0, x1 are columns and y0, y1 are rows
-        return np.array(bboxes_with_confidence).astype(int)
+        return boxes
 
     def run(self, img_path):
         log("*" * 75)
@@ -378,24 +353,29 @@ class MessagingService(messaging_pb2_grpc.MessagingServiceServicer):
         self.buffer = []
 
     def GetBoundingBoxes(self, request, context):
-        bboxes_pixels = obj_layer.run(request.path)
+        try:   
+            bboxes_pixels = obj_layer.run(request.path)
 
-        if len(bboxes_pixels) == 0:
-            print("No detections found")
-            return messaging_pb2.BBoxes(bboxes=[])
+            if len(bboxes_pixels) == 0:
+                print("No detections found")
+                return messaging_pb2.BBoxes(bboxes=[])
 
-        output = gps_translation_layer.run(request.path, bboxes_pixels)
+            output = gps_translation_layer.run(request.path, bboxes_pixels)
 
-        bbox_list = [
-            messaging_pb2.BBox(
-                latitude=bbox[0],
-                longitude=bbox[1],
-                radius=bbox[2],
-                confidence=bbox[3],
-            )
-            for bbox in output
-        ]
-        print(f"Returning {len(bbox_list)} bboxes")
+            bbox_list = [
+                messaging_pb2.BBox(
+                    latitude=bbox[0],
+                    longitude=bbox[1],
+                    radius=bbox[2],
+                    confidence=bbox[3],
+                )
+                for bbox in output
+            ]
+            print(f"Returning {len(bbox_list)} bboxes")
+        except Exception as e:
+            print(traceback.format_exc())
+            log(traceback.format_exc())
+            raise e
 
         return messaging_pb2.BBoxes(bboxes=bbox_list)
 
@@ -405,20 +385,14 @@ def serve(port_num):
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
 
-    using_tiny = False
+    # model_path = "../yolo/yolov3-416.onnx"
+    model_path = "../yolo/yolov3-416.trt"
 
-    if using_tiny:
-        weights_file = "yolo/yolov3-tiny.weights"
-        config_file = "yolo/yolov3-tiny.cfg"
-    else:
-        weights_file = "yolo/yolov3-aerial.weights"
-        config_file = "yolo/yolov3-aerial.cfg"
+    obj_layer = ObjectDetectionLayer(model_path=model_path)
 
     log(
-        f"Using detection model with weights from {weights_file} and config from {config_file}"
+        f"Using detection model loaded from {model_path}"
     )
-
-    obj_layer = ObjectDetectionLayer(config_file=config_file, weights_file=weights_file)
 
     gps_translation_layer = GPSTranslocationLayer()
 
