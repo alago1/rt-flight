@@ -4,7 +4,7 @@ import logging
 
 from engines.engine import EngineLoader
 import util.yolo_util as YoloUtil
-from util.logger import log_time
+from util.logging import log_time
 from .layer import PipelineLayer
 
 import numpy as np

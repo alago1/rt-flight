@@ -1,6 +1,6 @@
 from .layer import PipelineLayer
 from models.header_metadata import HeaderMetadata
-from util.logger import log_time
+from util.logging import log_time
 
 class HeaderReader(PipelineLayer):
     def __init__(self, *args, **kwargs):
