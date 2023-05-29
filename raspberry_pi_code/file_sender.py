@@ -1,5 +1,6 @@
 import zmq
-from bbox import BBox
+from models.bbox import BBox
+import models.error as error
 import pickle
 import io
 from pprint import pprint
@@ -16,6 +17,20 @@ img_path = "../data/dota_demo.jpg"
 socket.send_string(img_path)
 message = socket.recv()
 
-arr = pickle.load(io.BytesIO(message))
+try:
+    result = pickle.load(io.BytesIO(message))
 
-pprint(arr)
+    if isinstance(result, list):
+        # result is a list of BBox objects
+        pprint(result)
+    elif isinstance(result, error.DetectionError):
+        print(f"Received Detection Error: {result.error_msg}")
+    elif isinstance(result, error.HeaderError):
+        print(f"Received Header Error: {result.error_msg}")
+    else:
+        print("Received unknown error")
+except pickle.UnpicklingError:
+    print("Could not unpickle message")
+except Exception as e:
+    print("Received unknown error while trying to parse message:")
+    print(e)

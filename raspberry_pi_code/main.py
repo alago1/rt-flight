@@ -1,34 +1,24 @@
+import logging
+import traceback
+from typing import List
+
 import zmq
 import exiftool
 
 from layers.detector import DetectionLayer
 from layers.gps_translator import GPSTranslationLayer
 from layers.header_reader import HeaderReader
+from layers.parallel import ParallelLayer
 from models.bbox import BBox
 from models.error import DetectionError, HeaderError
-
-import logging
-import traceback
-import multiprocessing as mp
-from typing import List
 
 
 logger = logging.getLogger()
 
-def get_header_data(q, header_layer, path):
-    q.put(header_layer.run(path))
-
 
 def GetBoundingBoxes(path: str) -> List[BBox]:
     try:
-        q = mp.Queue()
-        p = mp.Process(target=get_header_data, args=(q, header_layer, path))
-        p.start()
-
-        bboxes_pixels = obj_layer.run(path)
-
-        p.join()
-        header_data = q.get()
+        header_data, bboxes_pixels = parallel_layer.run((path,), share_input=True)
 
         if len(bboxes_pixels) == 0:
             print("No detections found")
@@ -63,13 +53,16 @@ if __name__ == "__main__":
     model_path = "../yolo/yolov3-416.onnx"
     # model_path = "../yolo/yolov3-416.trt"
 
-    obj_layer = DetectionLayer(model_path=model_path, engine="onnx", providers=[("CUDAExecutionProvider")])
-    header_layer = HeaderReader()
+    parallel_layer = ParallelLayer([
+        HeaderReader(),
+        DetectionLayer(model_path, engine="onnx", providers=[("CUDAExecutionProvider")])
+    ])
     gps_translation_layer = GPSTranslationLayer()
 
     try:
         while True:
             message = socket.recv()  # Should obtain message which is path of new image
+            print('Received a message')
 
             try:
                 bboxes = GetBoundingBoxes(message.decode("utf-8"))
