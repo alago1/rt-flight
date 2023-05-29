@@ -282,7 +282,7 @@ def adjust_boxes(boxes, img_shape):
     (xmin,ymin,xmax,ymax) format
     '''
     if boxes is None or len(boxes) == 0:
-        return []
+        return np.empty(shape=(0, 4))
 
     image_shape = np.array(img_shape, dtype='float32')
     height, width = image_shape
