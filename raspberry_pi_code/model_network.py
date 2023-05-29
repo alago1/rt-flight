@@ -1,5 +1,4 @@
 import time
-from concurrent import futures
 from contextlib import redirect_stdout
 import traceback
 
@@ -14,9 +13,10 @@ import smopy
 
 # from dataclasses import dataclass
 import zmq
-from bbox import BBox
+from models.bbox import BBox
+from models.error import DetectionError, HeaderError
 
-import yolo_util as YoloUtil
+import util.yolo_util as YoloUtil
 from engines.engine import EngineLoader
 
 
@@ -26,7 +26,7 @@ def log(message):
     try:
         log_path
     except NameError:
-        log_path = 'logs.txt'
+        log_path = "logs.txt"
 
     with open(log_path, "a") as f:
         with redirect_stdout(f):
@@ -34,52 +34,32 @@ def log(message):
 
 
 class ObjectDetectionLayer:
-    def __init__(self, model_path=None, min_confidence=0.3):
+    def __init__(self, model_path: str = None, min_confidence: float = 0.3):
         start = time.monotonic()
 
         self.model_path = model_path
-        self.net = EngineLoader.load(self.model_path, engine='onnx', providers=[('CUDAExecutionProvider')])
+        self.net = EngineLoader.load(
+            self.model_path, engine="onnx", providers=[("CUDAExecutionProvider")]
+        )
         self.min_confidence = min_confidence
 
         elapsed = time.monotonic() - start
-        print(f'[Object Detection Layer] INFO: Finished loading in {elapsed:.4f}s')
+        print(f"[Object Detection Layer] INFO: Finished loading in {elapsed:.4f}s")
 
-
-    def _get_bboxes_pixels(self, img_path):
-        start = time.monotonic()
-
-        height, width = self.net.get_input_shape()
+    def _get_bboxes_pixels(self, img_path: str):
+        input_shape_hw = self.net.get_input_shape()
 
         # load and preprocess image
         img_pil = PIL.Image.open(img_path)
-        img = YoloUtil.preprocess_image(img_pil, (height, width))
+        img = YoloUtil.preprocess_image(img_pil, input_shape_hw)
 
         predictions = self.net(img)
-        predictions.sort(key=lambda x: x.shape[1])
-
-        boxes = []
-        for i in range(len(predictions)):
-            # boxes.append(self._decode_yolo_boxes(predictions[i][0], anchors[i], (height, width), img_pil.size))
-            boxes.append(
-                YoloUtil.decode_net_output(
-                    predictions[i],
-                    YoloUtil.v3_anchors[YoloUtil.v3_anchor_mask[i]],
-                    20,
-                    (height, width),
-                )
-            )
-
-        boxes = np.concatenate(boxes, axis=1)
-        boxes = YoloUtil.correct_boxes(boxes, img_pil.size[::-1], (height, width))
-        boxes, _, scores = YoloUtil.handle_predictions(
-            boxes, 20, confidence=self.min_confidence
+        boxes, _, scores = YoloUtil.postprocess_net_output(
+            predictions,
+            input_shape_hw,
+            img_pil.size[::-1],
+            confidence=self.min_confidence,
         )
-
-        # changes format from (x, y, w, h) to (x0, y0, x1, y1)
-        boxes = YoloUtil.adjust_boxes(boxes, img_pil.size[::-1])
-
-        # change to (x0, x1, y0, y1)
-        boxes = boxes[:, [0, 2, 1, 3]]
 
         # append confidence to each data point
         boxes = np.concatenate((boxes, 100 * scores.reshape(-1, 1)), axis=1).astype(int)
@@ -88,7 +68,7 @@ class ObjectDetectionLayer:
         # where x0, x1 are columns and y0, y1 are rows
         return boxes
 
-    def run(self, img_path):
+    def run(self, img_path: str):
         log("*" * 75)
         log(f"Running object detection on image: {img_path}")
         output = self._get_bboxes_pixels(img_path)
@@ -114,7 +94,7 @@ class GPSTranslocationLayer:
     image_width = None
     image_height = None
 
-    def _load_metadata(self, image_path):
+    def _load_metadata(self, image_path: str):
         with exiftool.ExifToolHelper() as et:
             metadata = et.get_metadata(image_path)[0]
 
@@ -345,7 +325,7 @@ class GPSTranslocationLayer:
         log("*" * 75)
         return center[0], center[1], radius
 
-    def run(self, image_path, bboxes):
+    def run(self, image_path: str, bboxes: np.ndarray):
         self._load_metadata(image_path)
         self._get_corner_coordinates()
 
@@ -367,7 +347,10 @@ def GetBoundingBoxes(path):
 
         bbox_list = [
             BBox(
-                latitude=bbox[0], longitude=bbox[1], radius=bbox[2], confidence=bbox[3]
+                latitude=bbox[0],
+                longitude=bbox[1],
+                radius=bbox[2],
+                confidence=bbox[3]
             )
             for bbox in output
         ]
@@ -380,10 +363,11 @@ def GetBoundingBoxes(path):
 
     return bbox_list
 
+
 if __name__ == "__main__":
     context = zmq.Context()
     socket = context.socket(zmq.REP)
-    socket.bind("tcp://*:5555")
+    socket.bind(f"tcp://*:5555")
 
     global log_path
     log_path = "logs.txt"
@@ -399,14 +383,16 @@ if __name__ == "__main__":
     try:
         while True:
             message = socket.recv()  # Should obtain message which is path of new image
-            
-            # TODO: Check if path is a valid image
+
             try:
                 bboxes = GetBoundingBoxes(message.decode("utf-8"))
-
                 socket.send_pyobj(bboxes)
-            except:
-                pass
-
+            except UnicodeDecodeError:
+                socket.send_pyobj(DetectionError("User cannot decode path message. Is it using UTF-8?"))
+            except FileNotFoundError:
+                socket.send_pyobj(DetectionError(f"File '{message.decode('utf-8')}' not found"))
+            except exiftool.exceptions.ExifToolException:
+                # TODO: there are other cases where exif data can be provided but is not valid. These should be handled
+                socket.send_pyobj(HeaderError(f"File '{message.decode('utf-8')}' does not have valid EXIF data"))
     except KeyboardInterrupt:
         pass
