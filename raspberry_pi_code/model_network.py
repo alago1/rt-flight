@@ -41,9 +41,7 @@ class ObjectDetectionLayer:
         start = time.monotonic()
 
         self.model_path = model_path
-
-        # self.net = EngineLoader.load(self.model_path, engine='onnx', providers=[('CUDAExecutionProvider')])
-        self.net = EngineLoader.load(self.model_path, engine='tensorrt')
+        self.net = EngineLoader.load(self.model_path, engine='onnx', providers=[('CUDAExecutionProvider')])
         self.min_confidence = min_confidence
 
         elapsed = time.monotonic() - start
@@ -385,8 +383,8 @@ def serve(port_num):
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
 
-    # model_path = "../yolo/yolov3-416.onnx"
-    model_path = "../yolo/yolov3-416.trt"
+    model_path = "../yolo/yolov3-416.onnx"
+    # model_path = "../yolo/yolov3-416.trt"
 
     obj_layer = ObjectDetectionLayer(model_path=model_path)
 
