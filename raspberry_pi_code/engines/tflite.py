@@ -17,7 +17,7 @@ class TfliteEngine(AbstractEngine):
         return (height, width)
 
     def __call__(self, input):
-        tensor_index = self.net.get_input_details()[0]["index"]
+        tensor_index = self.model.get_input_details()[0]["index"]
         self.model.set_tensor(tensor_index, input)
         self.model.invoke()
         output_details = self.model.get_output_details()

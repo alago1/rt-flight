@@ -8,11 +8,19 @@ logs.txt
 
 .vscode/
 
+# wheel build files
+*.whl
+
 # model weights and checkpoints
 weights/
 *.pth
 yolo.zip
 yolov3.h5
+*.tflite
+*.onnx
+*.h5
+*.trt
+*edgetpu.log
 
 *.weights
 *.names
