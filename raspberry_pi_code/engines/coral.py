@@ -1,8 +1,9 @@
-from engines.engine import AbstractEngine
-
 import numpy as np
 from pycoral.adapters import common
 from pycoral.utils import edgetpu
+
+from engines.engine import AbstractEngine
+
 
 class CoralEngine(AbstractEngine):
     def __init__(self, model_path: str, **kwargs):

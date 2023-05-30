@@ -1,8 +1,9 @@
 import logging
 
-from .layer import PipelineLayer
+from layers.layer import PipelineLayer
 from models.header_metadata import HeaderMetadata
 from util.logging import log_time
+
 
 class HeaderReader(PipelineLayer):
     @log_time

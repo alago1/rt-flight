@@ -1,7 +1,7 @@
 import multiprocessing as mp
-from typing import Sequence, TypeVar, Any
+from typing import Any, Sequence, TypeVar
 
-from .layer import PipelineLayer
+from layers.layer import PipelineLayer
 
 T = TypeVar("T", bound='PipelineLayer')
 

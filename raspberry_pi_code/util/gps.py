@@ -1,12 +1,13 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+
 import logging
+from typing import TYPE_CHECKING
 
 import geopy
 import geopy.distance
-import smopy
 import matplotlib.pyplot as plt
 import numpy as np
+import smopy
 
 if TYPE_CHECKING:
     from models.header_metadata import HeaderMetadata

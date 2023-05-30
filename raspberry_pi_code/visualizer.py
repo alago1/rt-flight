@@ -3,8 +3,7 @@ import os
 
 import cv2
 
-from model_network import ObjectDetectionLayer
-# from model_network import ObjectDetectionLayer
+from layers.detector import DetectionLayer
 
 
 def parse_args():
@@ -37,7 +36,7 @@ def main():
 
     img = cv2.imread(args.image)
 
-    detection_layer = ObjectDetectionLayer(args.model)
+    detection_layer = DetectionLayer(args.model, engine="onnx", providers=[("CUDAExecutionProvider")])
     bboxes = detection_layer.run(args.image)
 
 

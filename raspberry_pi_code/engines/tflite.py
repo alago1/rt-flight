@@ -2,6 +2,7 @@ import tflite_runtime.interpreter as tflite
 
 from engines.engine import AbstractEngine
 
+
 class TfliteEngine(AbstractEngine):
     def __init__(self, model_path: str, **kwargs):
         self.model_path = model_path

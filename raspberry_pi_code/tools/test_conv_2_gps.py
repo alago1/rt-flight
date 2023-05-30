@@ -1,11 +1,13 @@
 # pylint: disable=syntax-error
-from exif import Image
-from math import radians, degrees, sin, cos, tan, atan2, sqrt, atan, asin
 import json
-import smopy
+from math import asin, atan, atan2, cos, degrees, radians, sin, sqrt, tan
+
 import matplotlib.pyplot as plt
 import numpy as np
+import smopy
+from exif import Image
 from geopy import distance
+
 
 class GPSTranslocationLayer:
     

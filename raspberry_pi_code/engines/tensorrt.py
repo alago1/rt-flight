@@ -1,8 +1,8 @@
 
 import numpy as np
-import tensorrt as trt
 import pycuda.autoinit  # required to initialize cuda
 import pycuda.driver as cuda
+import tensorrt as trt
 
 from engines.engine import AbstractEngine
 

@@ -1,7 +1,8 @@
-import time
 import logging
-from typing import Optional
 import sys
+import time
+from typing import Optional
+
 
 def log_time(f):
     def timed_f(*args, **kwargs):

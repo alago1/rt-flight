@@ -1,11 +1,12 @@
+import logging
 from dataclasses import dataclass
 from typing import Optional
-import logging
 
 import exiftool
 import numpy as np
 
 from util.gps import get_corner_coordinates
+
 
 @dataclass
 class HeaderMetadata:
@@ -52,8 +53,8 @@ class HeaderMetadata:
         new_metadata.altitude = metadata["EXIF:GPSAltitude"]
         new_metadata.heading = dict.get(metadata, "EXIF:GPSImgDirection", 0)
 
-        if new_metadata.heading == 0 and logger:
-            logger.warning(
+        if new_metadata.heading == 0:
+            logging.warning(
                 "WARNING: Heading defaulted to 0. The program will continute to run, but this may cause issues."
             )
 

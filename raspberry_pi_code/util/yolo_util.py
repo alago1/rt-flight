@@ -1,12 +1,12 @@
 # Based on implementation from: https://github.com/david8862/keras-YOLOv3-model-set/blob/master/common/yolo_postprocess_np.py
 
+import copy
+from typing import List, Tuple
+
 import numpy as np
-import PIL
+import PIL.Image
 
 from util.logging import log_time
-
-import copy
-from typing import Tuple, List
 
 # yolov3 anchors
 # v3_anchors = [[116,90, 156,198, 373,326], [30,61, 62,45, 59,119], [10,13, 16,30, 33,23]]

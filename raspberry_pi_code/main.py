@@ -2,8 +2,8 @@ import logging
 import traceback
 from typing import List
 
-import zmq
 import exiftool
+import zmq
 
 from layers.detector import DetectionLayer
 from layers.gps_translator import GPSTranslationLayer

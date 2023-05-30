@@ -1,14 +1,14 @@
-import time
-from typing import Optional, Sequence, Tuple
 import logging
-
-from engines.engine import EngineLoader
-import util.yolo_util as YoloUtil
-from util.logging import log_time
-from .layer import PipelineLayer
+from typing import Sequence, Tuple
 
 import numpy as np
-import PIL
+import PIL.Image
+
+import util.yolo_util as YoloUtil
+from engines.engine import EngineLoader
+from layers.layer import PipelineLayer
+from util.logging import log_time
+
 
 class DetectionLayer(PipelineLayer):
     def __init__(self, model_path: str, min_confidence: float = 0.3, *args, **kwargs):

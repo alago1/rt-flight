@@ -1,6 +1,7 @@
-import PIL.Image as Image
-from exif import Image as ExifImage, GpsAltitudeRef
 import numpy as np
+import PIL.Image as Image
+from exif import GpsAltitudeRef
+from exif import Image as ExifImage
 from geopy import Point
 from geopy.distance import geodesic
 

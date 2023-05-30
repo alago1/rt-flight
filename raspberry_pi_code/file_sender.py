@@ -1,9 +1,11 @@
-import zmq
-from models.bbox import BBox
-import models.error as error
-import pickle
 import io
+import pickle
 from pprint import pprint
+
+import zmq
+
+import models.error as error
+from models.bbox import BBox
 
 context = zmq.Context()
 
