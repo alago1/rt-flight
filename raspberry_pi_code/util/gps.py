@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
+import logging
 
 import geopy
 import geopy.distance
@@ -75,8 +76,7 @@ def get_radius_of_bbox_in_meters(metadata: HeaderMetadata, bbox_pixels):
 def bbox_gps_center_and_radius_in_meters(metadata: HeaderMetadata, bbox_pixels):
     center = bbox_pixels_to_center_gps(metadata, bbox_pixels)
     radius = get_radius_of_bbox_in_meters(metadata, bbox_pixels)
-    # log(f"Detection for center: {center}, radius: {radius}")
-    # log("*" * 75)
+    logging.debug(f"Detection for center: {center}, radius: {radius}")
     return center[0], center[1], radius
 
 

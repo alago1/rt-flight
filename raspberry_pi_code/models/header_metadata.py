@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional
-from logging import Logger
+import logging
 
 import exiftool
 import numpy as np
@@ -28,14 +28,13 @@ class HeaderMetadata:
 
 
     @staticmethod
-    def read(image_path: str, logger: Optional[Logger] = None):
+    def read(image_path: str):
         with exiftool.ExifToolHelper() as et:
             metadata = et.get_metadata(image_path)[0]
 
         new_metadata = HeaderMetadata()
 
-        if logger:
-            logger.info(f"Metadata: {metadata}")
+        logging.info(f"Metadata: {metadata}")
 
         new_metadata.image_width = (
             dict.get(metadata, "EXIF:ExifImageWidth", None)

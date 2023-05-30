@@ -13,9 +13,7 @@ class ParallelLayer(PipelineLayer):
     queues: Sequence[mp.Queue] = []
     layers: Sequence[T] = []
 
-    def __init__(self, layers: Sequence[T], *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
+    def __init__(self, layers: Sequence[T]):
         self.layers = layers
         self.queues = [mp.Queue() for _ in layers]
 

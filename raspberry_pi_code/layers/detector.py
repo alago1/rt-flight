@@ -12,13 +12,8 @@ import PIL
 
 class DetectionLayer(PipelineLayer):
     def __init__(self, model_path: str, min_confidence: float = 0.3, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
         self.model_path = model_path
         self.min_confidence = min_confidence
-        # self.net = EngineLoader.load(
-        #     self.model_path, engine="onnx", providers=[("CUDAExecutionProvider")]
-        # )
         self.net = self.load_model(*args, **kwargs)
 
 
@@ -27,6 +22,7 @@ class DetectionLayer(PipelineLayer):
         return EngineLoader.load(self.model_path, *args, **kwargs)
 
 
+    @log_time
     def _get_bboxes_pixels(self, img_path: str) -> Sequence[Tuple[int, int, int, int, int]]:
         """
         Returns a numpy array of bounding boxes in the format of x0, x1, y0, y1, confidence
@@ -58,9 +54,7 @@ class DetectionLayer(PipelineLayer):
 
 
     def run(self, img_path: str):
-        self._logger.info("*" * 75)
-        self._logger.info(f"Running object detection on image: {img_path}")
+        logging.info(f"Running object detection on image: {img_path}")
         output = self._get_bboxes_pixels(img_path)
-        self._logger.info(f"Number of detections found: {len(output)}")
-        self._logger.info("*" * 75)
+        logging.info(f"Number of detections found: {len(output)}")
         return output

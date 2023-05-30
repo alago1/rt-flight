@@ -3,6 +3,8 @@
 import numpy as np
 import PIL
 
+from util.logging import log_time
+
 import copy
 from typing import Tuple, List
 
@@ -172,7 +174,7 @@ def handle_predictions(
     else:
         return [], [], []
 
-
+@log_time
 def nms_boxes(
     boxes,
     classes,

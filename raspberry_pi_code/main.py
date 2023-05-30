@@ -11,9 +11,7 @@ from layers.header_reader import HeaderReader
 from layers.parallel import ParallelLayer
 from models.bbox import BBox
 from models.error import DetectionError, HeaderError
-
-
-logger = logging.getLogger()
+from util.logging import setup_logger
 
 
 def GetBoundingBoxes(path: str) -> List[BBox]:
@@ -21,7 +19,7 @@ def GetBoundingBoxes(path: str) -> List[BBox]:
         header_data, bboxes_pixels = parallel_layer.run((path,), share_input=True)
 
         if len(bboxes_pixels) == 0:
-            print("No detections found")
+            logging.info("No detections found")
             return []
 
         output = gps_translation_layer.run(header_data, bboxes_pixels)
@@ -35,11 +33,10 @@ def GetBoundingBoxes(path: str) -> List[BBox]:
             )
             for bbox in output
         ]
-        print(f"Returning {len(bbox_list)} bboxes")
+        logging.info(f"Returning {len(bbox_list)} bboxes")
 
     except Exception as e:
-        print(traceback.format_exc())
-        logger.error(traceback.format_exc())
+        logging.error(traceback.format_exc())
         raise e
 
     return bbox_list
@@ -49,6 +46,8 @@ if __name__ == "__main__":
     context = zmq.Context()
     socket = context.socket(zmq.REP)
     socket.bind(f"tcp://*:5555")
+
+    setup_logger()
 
     model_path = "../yolo/yolov3-416.onnx"
     # model_path = "../yolo/yolov3-416.trt"
