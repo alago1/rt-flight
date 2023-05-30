@@ -1,10 +1,10 @@
 import importlib
-from typing import Literal, Type, TypeVar, Union
+from typing import Literal, Type, TypeVar, Tuple, Any
 
 T = TypeVar('T', bound='AbstractEngine')
 
 SUPPORTED_ENGINES = ['tflite', 'coral', 'onnx', 'tensorrt']
-U = Union[TypeVar('U', *SUPPORTED_ENGINES), Literal['auto']]
+ENGINE_TYPE = Literal['tflite', 'coral', 'onnx', 'tensorrt', 'auto']
 
 known_extensions = {
     'edgetpu.tflite': 'coral',
@@ -19,15 +19,24 @@ class AbstractEngine:
         assert hasattr(cls, '__call__'), f"class {cls.__qualname__} must be callable"
         assert hasattr(cls, 'get_input_shape') and callable(getattr(cls, 'get_input_shape')), f"get_input_shape must be defined in {cls.__qualname__}"
 
+    def load_model(self) -> Any:
+        raise NotImplementedError
+    
+    def __call__(self, *args, **kwargs) -> None:
+        raise NotImplementedError
+    
+    def get_input_shape(self) -> Tuple[int, int]:
+        raise NotImplementedError
+
 
 class EngineLoader:
 
     @staticmethod
-    def load(model_path: str, engine: U = 'auto', *args, **kwargs) -> Type[T]:
+    def load(model_path: str, engine: ENGINE_TYPE = 'auto', *args, **kwargs) -> Type[T]:
         if engine == 'auto':
             for extension, engine_name in known_extensions.items():
                 if model_path.lower().endswith(extension):
-                    engine = engine_name
+                    engine = engine_name  # type: ignore
                     break
             else:
                 raise ValueError(f"Could not infer engine from model path '{model_path}'. Please specify engine manually.")

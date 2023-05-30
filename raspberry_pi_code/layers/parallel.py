@@ -1,5 +1,5 @@
 import multiprocessing as mp
-from typing import Any, Sequence, TypeVar
+from typing import Any, Sequence, TypeVar, List
 
 from layers.layer import PipelineLayer
 
@@ -10,8 +10,8 @@ def run_layer(layer: T, q: mp.Queue, args):
 
 
 class ParallelLayer(PipelineLayer):
-    queues: Sequence[mp.Queue] = []
     layers: Sequence[T] = []
+    queues: Sequence[mp.Queue] = []
 
     def __init__(self, layers: Sequence[T]):
         self.layers = layers
@@ -34,7 +34,7 @@ class ParallelLayer(PipelineLayer):
         if share_input:
             layer_args = [layer_args for _ in self.layers]
 
-        processes: Sequence[mp.Process] = []
+        processes: List[mp.Process] = []
         for layer, q, args in zip(self.layers, self.queues, layer_args):
             p = mp.Process(target=run_layer, args=(layer, q, args))
             p.start()
