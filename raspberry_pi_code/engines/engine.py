@@ -1,11 +1,18 @@
 import importlib
-from typing import Type, TypeVar
+from typing import Type, TypeVar, Union, Literal
 
 
 T = TypeVar('T', bound='AbstractEngine')
 
 SUPPORTED_ENGINES = ['tflite', 'coral', 'onnx', 'tensorrt']
-U = TypeVar('U', *SUPPORTED_ENGINES)
+U = Union[TypeVar('U', *SUPPORTED_ENGINES), Literal['auto']]
+
+known_extensions = {
+    'edgetpu.tflite': 'coral',
+    'tflite': 'tflite',
+    'onnx': 'onnx',
+    'trt': 'tensorrt'
+}
 
 class AbstractEngine:
     def __init_subclass__(cls) -> None:
@@ -17,7 +24,15 @@ class AbstractEngine:
 class EngineLoader:
 
     @staticmethod
-    def load(model_path: str, engine: U='tflite', *args, **kwargs) -> Type[T]:
+    def load(model_path: str, engine: U = 'auto', *args, **kwargs) -> Type[T]:
+        if engine == 'auto':
+            for extension, engine_name in known_extensions.items():
+                if model_path.lower().endswith(extension):
+                    engine = engine_name
+                    break
+            else:
+                raise ValueError(f"Could not infer engine from model path '{model_path}'. Please specify engine manually.")
+
         if engine not in SUPPORTED_ENGINES:
             raise NotImplementedError(f"Engine '{engine}' is not supported. Please choose one of {SUPPORTED_ENGINES}")
         

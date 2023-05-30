@@ -8,7 +8,7 @@ class TfliteEngine(AbstractEngine):
         self.model = self.load_model(**kwargs)
     
     def load_model(self, **kwargs):
-        model = tflite.Interpreter(self.model_path, num_threads=4, **kwargs)
+        model = tflite.Interpreter(self.model_path, **kwargs)
         model.allocate_tensors()
         return model
 

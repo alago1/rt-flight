@@ -1,17 +1,36 @@
-import grpc
-import os, sys
+import zmq
+from models.bbox import BBox
+import models.error as error
+import pickle
+import io
+from pprint import pprint
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
-import messaging_pb2
-import messaging_pb2_grpc
+context = zmq.Context()
 
-def run(port_num):
-    channel = grpc.insecure_channel(f'localhost:{port_num}')
-    stub = messaging_pb2_grpc.MessagingServiceStub(channel)
-    img_path = "2023-04-09_19-58-14_RGB.jpg" # has GPSDirection
+#  Socket to talk to server
+print("Connecting to Model Network")
+socket = context.socket(zmq.REQ)
+socket.connect("tcp://localhost:5555")
 
-    out = stub.GetBoundingBoxes(messaging_pb2.File_Payload(path=img_path))
-    print(out.bboxes)
-if __name__ == '__main__':
-    port_arg = sys.argv[1] if len(sys.argv) > 1 else 50951
-    run(port_num=port_arg)
+img_path = "../data/dota_demo.jpg"
+
+socket.send_string(img_path)
+message = socket.recv()
+
+try:
+    result = pickle.load(io.BytesIO(message))
+
+    if isinstance(result, list):
+        # result is a list of BBox objects
+        pprint(result)
+    elif isinstance(result, error.DetectionError):
+        print(f"Received Detection Error: {result.error_msg}")
+    elif isinstance(result, error.HeaderError):
+        print(f"Received Header Error: {result.error_msg}")
+    else:
+        print("Received unknown error")
+except pickle.UnpicklingError:
+    print("Could not unpickle message")
+except Exception as e:
+    print("Received unknown error while trying to parse message:")
+    print(e)

@@ -3,16 +3,31 @@
 import numpy as np
 import PIL
 
+from util.logging import log_time
+
 import copy
+from typing import Tuple, List
 
 # yolov3 anchors
 # v3_anchors = [[116,90, 156,198, 373,326], [30,61, 62,45, 59,119], [10,13, 16,30, 33,23]]
-v3_anchor_mask = np.array([[6,7,8], [3,4,5], [0,1,2]])
-v3_anchors = np.array([[10,13], [16,30], [33,23], [30,61], [62,45], [59,119], [116,90], [156,198], [373,326]])
+v3_anchor_mask = np.array([[6, 7, 8], [3, 4, 5], [0, 1, 2]])
+v3_anchors = np.array(
+    [
+        [10, 13],
+        [16, 30],
+        [33, 23],
+        [30, 61],
+        [62, 45],
+        [59, 119],
+        [116, 90],
+        [156, 198],
+        [373, 326],
+    ]
+)
 
 
 def _sigmoid(x):
-    return 1. / (1. + np.exp(-x))
+    return 1.0 / (1.0 + np.exp(-x))
 
 
 def preprocess_image(image_pil, net_input_shape):
@@ -22,7 +37,7 @@ def preprocess_image(image_pil, net_input_shape):
     scale = min(net_input_width / img_width, net_input_height / img_height)
     padding_width = int(img_width * scale)
     padding_height = int(img_height * scale)
-    
+
     dx = (net_input_width - padding_width) // 2
     dy = (net_input_height - padding_height) // 2
     offset = (dx, dy)
@@ -32,23 +47,27 @@ def preprocess_image(image_pil, net_input_shape):
     new_image.paste(img, offset)
     img = new_image
 
-    img = np.asarray(img).astype(np.float32) / 255.
+    img = np.asarray(img).astype(np.float32) / 255.0
     img = np.expand_dims(img, axis=0)
     return img
 
 
 def decode_net_output(prediction, anchors, num_classes, input_shape):
-    '''Decode final layer features to bounding box parameters.'''
+    """Decode final layer features to bounding box parameters."""
     batch_size = np.shape(prediction)[0]
     num_anchors = len(anchors)
 
     grid_shape = np.shape(prediction)[1:3]
-    #check if stride on height & width are same
-    assert input_shape[0]//grid_shape[0] == input_shape[1]//grid_shape[1], 'model stride mismatch.'
+    # check if stride on height & width are same
+    assert (
+        input_shape[0] // grid_shape[0] == input_shape[1] // grid_shape[1]
+    ), "model stride mismatch."
     stride = input_shape[0] // grid_shape[0]
 
-    prediction = np.reshape(prediction,
-                            (batch_size, grid_shape[0] * grid_shape[1] * num_anchors, num_classes + 5))
+    prediction = np.reshape(
+        prediction,
+        (batch_size, grid_shape[0] * grid_shape[1] * num_anchors, num_classes + 5),
+    )
 
     ################################
     # generate x_y_offset grid map
@@ -75,7 +94,9 @@ def decode_net_output(prediction, anchors, num_classes, input_shape):
 
     # Sigmoid objectness scores
     objectness = _sigmoid(prediction[..., 4])  # p_o (objectness score)
-    objectness = np.expand_dims(objectness, -1)  # To make the same number of values for axis 0 and 1
+    objectness = np.expand_dims(
+        objectness, -1
+    )  # To make the same number of values for axis 0 and 1
 
     # Sigmoid class scores
     class_scores = _sigmoid(prediction[..., 5:])
@@ -84,19 +105,19 @@ def decode_net_output(prediction, anchors, num_classes, input_shape):
 
 
 def correct_boxes(predictions, img_shape, model_input_shape):
-    '''rescale predicition boxes back to original image shape'''
+    """rescale predicition boxes back to original image shape"""
     box_xy = predictions[..., :2]
     box_wh = predictions[..., 2:4]
     objectness = np.expand_dims(predictions[..., 4], -1)
     class_scores = predictions[..., 5:]
 
     # model_input_shape & image_shape should be (height, width) format
-    model_input_shape = np.array(model_input_shape, dtype='float32')
-    image_shape = np.array(img_shape, dtype='float32')
+    model_input_shape = np.array(model_input_shape, dtype="float32")
+    image_shape = np.array(img_shape, dtype="float32")
 
-    new_shape = np.round(image_shape * np.min(model_input_shape/image_shape))
-    offset = (model_input_shape-new_shape)/2./model_input_shape
-    scale = model_input_shape/new_shape
+    new_shape = np.round(image_shape * np.min(model_input_shape / image_shape))
+    offset = (model_input_shape - new_shape) / 2.0 / model_input_shape
+    scale = model_input_shape / new_shape
     # reverse offset/scale to match (w,h) order
     offset = offset[..., ::-1]
     scale = scale[..., ::-1]
@@ -115,7 +136,9 @@ def correct_boxes(predictions, img_shape, model_input_shape):
     return np.concatenate([box_xy, box_wh, objectness, class_scores], axis=2)
 
 
-def handle_predictions(predictions, num_classes, max_boxes=100, confidence=0.1, iou_threshold=0.4):
+def handle_predictions(
+    predictions, num_classes, max_boxes=100, confidence=0.1, iou_threshold=0.4
+):
     boxes = predictions[:, :, :4]
     box_confidences = np.expand_dims(predictions[:, :, 4], -1)
     box_class_probs = predictions[:, :, 5:]
@@ -136,11 +159,13 @@ def handle_predictions(predictions, num_classes, max_boxes=100, confidence=0.1, 
     scores = box_class_scores[pos]
 
     # Boxes, Classes and Scores returned from NMS
-    n_boxes, n_classes, n_scores = nms_boxes(boxes, classes, scores, iou_threshold, confidence=confidence)
+    n_boxes, n_classes, n_scores = nms_boxes(
+        boxes, classes, scores, iou_threshold, confidence=confidence
+    )
 
     if n_boxes:
         boxes = np.concatenate(n_boxes)
-        classes = np.concatenate(n_classes).astype('int32')
+        classes = np.concatenate(n_classes).astype("int32")
         scores = np.concatenate(n_scores)
         boxes, classes, scores = filter_boxes(boxes, classes, scores, max_boxes)
 
@@ -148,9 +173,18 @@ def handle_predictions(predictions, num_classes, max_boxes=100, confidence=0.1, 
 
     else:
         return [], [], []
-    
 
-def nms_boxes(boxes, classes, scores, iou_threshold, confidence=0.1, is_soft=False, use_exp=False, sigma=0.5):
+@log_time
+def nms_boxes(
+    boxes,
+    classes,
+    scores,
+    iou_threshold,
+    confidence=0.1,
+    is_soft=False,
+    use_exp=False,
+    sigma=0.5,
+):
     nboxes, nclasses, nscores = [], [], []
     for c in set(classes):
         # handle data for one class
@@ -174,9 +208,9 @@ def nms_boxes(boxes, classes, scores, iou_threshold, confidence=0.1, is_soft=Fal
             nscores.append(copy.deepcopy(s_nms[i]))
 
             # swap the max line and first line
-            b_nms[[i,0],:] = b_nms[[0,i],:]
-            c_nms[[i,0]] = c_nms[[0,i]]
-            s_nms[[i,0]] = s_nms[[0,i]]
+            b_nms[[i, 0], :] = b_nms[[0, i], :]
+            c_nms[[i, 0]] = c_nms[[0, i]]
+            s_nms[[i, 0]] = s_nms[[0, i]]
 
             iou = box_diou(b_nms)
 
@@ -237,9 +271,11 @@ def box_diou(boxes):
     iou = inter / (areas[1:] + areas[0] - inter)
 
     # box center distance
-    x_center = x + w/2
-    y_center = y + h/2
-    center_distance = np.power(x_center[1:] - x_center[0], 2) + np.power(y_center[1:] - y_center[0], 2)
+    x_center = x + w / 2
+    y_center = y + h / 2
+    center_distance = np.power(x_center[1:] - x_center[0], 2) + np.power(
+        y_center[1:] - y_center[0], 2
+    )
 
     # get enclosed area
     enclose_xmin = np.minimum(x[1:], x[0])
@@ -257,10 +293,10 @@ def box_diou(boxes):
 
 
 def filter_boxes(boxes, classes, scores, max_boxes):
-    '''
+    """
     Sort the prediction boxes according to score
     and only pick top "max_boxes" ones
-    '''
+    """
     # sort result according to scores
     sorted_indices = np.argsort(scores)
     sorted_indices = sorted_indices[::-1]
@@ -277,14 +313,14 @@ def filter_boxes(boxes, classes, scores, max_boxes):
 
 
 def adjust_boxes(boxes, img_shape):
-    '''
+    """
     change box format from (x,y,w,h) top left coordinate to
     (xmin,ymin,xmax,ymax) format
-    '''
+    """
     if boxes is None or len(boxes) == 0:
         return np.empty(shape=(0, 4))
 
-    image_shape = np.array(img_shape, dtype='float32')
+    image_shape = np.array(img_shape, dtype="float32")
     height, width = image_shape
 
     adjusted_boxes = []
@@ -296,10 +332,62 @@ def adjust_boxes(boxes, img_shape):
         xmax = x + w
         ymax = y + h
 
-        ymin = max(0, np.floor(ymin + 0.5).astype('int32'))
-        xmin = max(0, np.floor(xmin + 0.5).astype('int32'))
-        ymax = min(height, np.floor(ymax + 0.5).astype('int32'))
-        xmax = min(width, np.floor(xmax + 0.5).astype('int32'))
-        adjusted_boxes.append([xmin,ymin,xmax,ymax])
+        ymin = max(0, np.floor(ymin + 0.5).astype("int32"))
+        xmin = max(0, np.floor(xmin + 0.5).astype("int32"))
+        ymax = min(height, np.floor(ymax + 0.5).astype("int32"))
+        xmax = min(width, np.floor(xmax + 0.5).astype("int32"))
+        adjusted_boxes.append([xmin, ymin, xmax, ymax])
 
-    return np.array(adjusted_boxes,dtype=np.int32)
+    return np.array(adjusted_boxes, dtype=np.int32)
+
+
+def postprocess_net_output(
+    net_out: List[np.ndarray],
+    net_input_shape: Tuple[int, int],
+    image_input_shape: Tuple[int, int],
+    confidence: float = 0.1,
+    iou_threshold: float = 0.4,
+    max_boxes: int = 100,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Post process the output of the network to get the final bounding boxes
+    in the format (x0, y0, x1, y1) and the corresponding classes and scores.
+
+    net_out: the output of the network as a list of numpy arrays
+    net_input_shape: the shape of the input to the network in the format (height, width)
+    image_input_shape: the shape of the input image in the format (height, width)
+    confidence: the confidence threshold
+    iou_threshold: the IoU threshold
+    max_boxes: the maximum number of boxes to return
+    """
+    net_out.sort(key=lambda x: x.shape[1])
+
+    num_classes = 20  # TODO: should get this from the model instead
+
+    boxes = [
+        decode_net_output(
+            prediction,
+            v3_anchors[v3_anchor_mask[i]],
+            num_classes,
+            net_input_shape,
+        )
+        for i, prediction in enumerate(net_out)
+    ]
+
+    boxes = np.concatenate(boxes, axis=1)
+    boxes = correct_boxes(boxes, image_input_shape, net_input_shape)
+    boxes, classes, scores = handle_predictions(
+        boxes,
+        num_classes,
+        max_boxes,
+        confidence,
+        iou_threshold
+    )
+
+    # changes format from (x, y, w, h) to (x0, y0, x1, y1)
+    boxes = adjust_boxes(boxes, image_input_shape)
+
+    # change to (x0, x1, y0, y1)
+    boxes = boxes[:, [0, 2, 1, 3]]
+
+    return boxes, classes, scores
