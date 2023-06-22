@@ -20,33 +20,32 @@ def destination_point(start_lat, start_lon, bearing, distance):
 
 
 def pixel_to_gps(metadata: HeaderMetadata, pixel):
-    x, y = pixel
+    y, x = pixel  # x: cols, y: rows
 
-    center_relative_position_pixel = (
-        x - metadata.image_width / 2,
+    # center relative pixel position
+    relative_y, relative_x = (
         y - metadata.image_height / 2,
+        x - metadata.image_width / 2,
     )
 
-    pixel_heading = (
-        metadata.heading
-        + np.degrees(np.arctan2(*center_relative_position_pixel[::-1]))
-        + 90  # this may be wrong :shrug:
-    )
+    height_meters = 2 * metadata.half_image_height_meters
+    width_meters = 2 * metadata.half_image_width_meters
 
-    displacement_x_meters = (
-        (center_relative_position_pixel[0] / metadata.image_width)
-        * 2
-        * metadata.half_image_height_meters
-    )
-    displacement_y_meters = (
-        (center_relative_position_pixel[1] / metadata.image_height)
-        * 2
-        * metadata.half_image_width_meters
-    )
+    height_meters_per_pixel = height_meters / metadata.image_height
+    width_meters_per_pixel = width_meters / metadata.image_width
+
+    displacement_y_meters = relative_y * height_meters_per_pixel
+    displacement_x_meters = relative_x * width_meters_per_pixel
 
     distance_meters = np.sqrt(
         displacement_x_meters**2 + displacement_y_meters**2
     )
+    
+    # angle from center of image to pixel
+    in_frame_angle = np.degrees(np.arctan2(relative_y, relative_x))
+
+    # add 90 degrees to account for the fact that 0 degrees is north
+    pixel_heading = metadata.heading + in_frame_angle + 90
 
     return destination_point(
         metadata.latitude, metadata.longitude, pixel_heading, distance_meters
@@ -62,19 +61,30 @@ def bbox_pixels_to_center_gps(metadata: HeaderMetadata, bbox_pixels):
 
 def get_radius_of_bbox_in_meters(metadata: HeaderMetadata, bbox_pixels):
     y_min, y_max, x_min, x_max = bbox_pixels  # x: cols, y: rows
-    axis_length_pixels = (y_max - y_min) / 2, (x_max - x_min) / 2
-    axis_length_meters = (
-        axis_length_pixels[0]
-        / metadata.image_height
-        * 2
-        * metadata.half_image_height_meters,
-        axis_length_pixels[1] / metadata.image_width * 2 * metadata.half_image_width_meters,
+    semiaxis_length_pixels = (y_max - y_min) / 2, (x_max - x_min) / 2
+
+    height_meters = 2 * metadata.half_image_height_meters
+    width_meters = 2 * metadata.half_image_width_meters
+
+    height_meters_per_pixel = height_meters / metadata.image_height
+    width_meters_per_pixel = width_meters / metadata.image_width
+
+    semiaxis_length_meters = (
+        semiaxis_length_pixels[0] * height_meters_per_pixel,
+        semiaxis_length_pixels[1] * width_meters_per_pixel,
     )
 
-    return np.sqrt(axis_length_meters[0] ** 2 + axis_length_meters[1] ** 2)
+    return np.sqrt(semiaxis_length_meters[0] ** 2 + semiaxis_length_meters[1] ** 2)
 
 
 def bbox_gps_center_and_radius_in_meters(metadata: HeaderMetadata, bbox_pixels):
+    """
+    Returns the center of the bbox in gps coordinates (lat, lon) and the radius of the bbox in meters
+
+    metadata: HeaderMetadata
+    bbox_pixels: (y_min, y_max, x_min, x_max) in pixels where x: cols, y: rows
+    """
+
     center = bbox_pixels_to_center_gps(metadata, bbox_pixels)
     radius = get_radius_of_bbox_in_meters(metadata, bbox_pixels)
     logging.debug(f"Detection for center: {center}, radius: {radius}")

@@ -97,6 +97,8 @@ class HeaderMetadata:
         new_metadata.half_image_width_meters = new_metadata.altitude * sensor_width / focal_length
         new_metadata.half_image_height_meters = new_metadata.altitude * sensor_height / focal_length
 
+        logging.debug(f"Image width, height meters: {2 * new_metadata.half_image_width_meters}, {2 * new_metadata.half_image_height_meters}")
+
         new_metadata.top_left, new_metadata.top_right, new_metadata.bottom_left, new_metadata.bottom_right = get_corner_coordinates(new_metadata)
 
         return new_metadata

@@ -26,10 +26,10 @@ def GetBoundingBoxes(path: str) -> List[BBox]:
 
         bbox_list = [
             BBox(
-                latitude=bbox[0],
-                longitude=bbox[1],
-                radius=bbox[2],
-                confidence=bbox[3]
+                latitude=float(bbox[0]),
+                longitude=float(bbox[1]),
+                radius=float(bbox[2]),
+                confidence=float(bbox[3])
             )
             for bbox in output
         ]

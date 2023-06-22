@@ -1,0 +1,18 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+#map {
+  height: 100%;
+  width: 100%;
+}
+
+.marker-popup {
+  display: flex;
+  flex-direction: column;
+}
+
+.cluster-0 {
+  filter: invert(100%);
+}
