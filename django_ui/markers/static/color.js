@@ -321,7 +321,6 @@ function nRandomColorFilters(n) {
         const hue = i * 360 / Math.max(n, 3);
         const rgb = hslToRgb(hue, 50, 50);
         const color = new Color(rgb[0], rgb[1], rgb[2]);
-        console.log(hue)
         const solver = new Solver(color);
         const result = solver.solve();
         filters.push(result.filter);

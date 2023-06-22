@@ -11,6 +11,7 @@ from layers.header_reader import HeaderReader
 from layers.parallel import ParallelLayer
 from models.bbox import BBox
 from models.error import DetectionError, HeaderError
+from models.header_metadata import HeaderMissingError
 from util.logging import setup_logger
 
 
@@ -64,14 +65,16 @@ if __name__ == "__main__":
             print('Received a message')
 
             try:
-                bboxes = GetBoundingBoxes(message.decode("utf-8"))
+                bboxes = GetBoundingBoxes(message.decode())
                 socket.send_pyobj(bboxes)
+            except HeaderMissingError as e:
+                logging.info(f"Header missing from image '{message.decode()}'")
+                socket.send_pyobj(HeaderError(f"Header missing from image '{message.decode()}': {str(e)}"))
             except UnicodeDecodeError:
                 socket.send_pyobj(DetectionError("User cannot decode path message. Is it using UTF-8?"))
             except FileNotFoundError:
-                socket.send_pyobj(DetectionError(f"File '{message.decode('utf-8')}' not found"))
+                socket.send_pyobj(DetectionError(f"File '{message.decode()}' not found"))
             except exiftool.exceptions.ExifToolException:
-                # TODO: there are other cases where exif data can be provided but is not valid. These should be handled
-                socket.send_pyobj(HeaderError(f"File '{message.decode('utf-8')}' does not have valid EXIF data"))
+                socket.send_pyobj(HeaderError(f"File '{message.decode()}' does not have valid EXIF data"))
     except KeyboardInterrupt:
         pass

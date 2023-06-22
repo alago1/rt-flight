@@ -7,6 +7,8 @@ import numpy as np
 
 from util.gps import get_corner_coordinates
 
+class HeaderMissingError(Exception):
+    pass
 
 @dataclass
 class HeaderMetadata:
@@ -38,39 +40,48 @@ class HeaderMetadata:
         logging.info(f"Metadata: {metadata}")
 
         new_metadata.image_width = (
-            dict.get(metadata, "EXIF:ExifImageWidth", None)
-            or dict.get(metadata, "EXIF:ImageWidth", None)
+            dict.get(metadata, "EXIF:ExifImageWidth")
+            or dict.get(metadata, "EXIF:ImageWidth")
             or dict.get(metadata, "File:ImageWidth")
         )
         new_metadata.image_height = (
-            dict.get(metadata, "EXIF:ExifImageHeight", None)
-            or dict.get(metadata, "EXIF:ImageHeight", None)
+            dict.get(metadata, "EXIF:ExifImageHeight")
+            or dict.get(metadata, "EXIF:ImageHeight")
             or dict.get(metadata, "File:ImageHeight")
         )
 
-        new_metadata.latitude = metadata["EXIF:GPSLatitude"]
-        new_metadata.longitude = metadata["EXIF:GPSLongitude"]
-        new_metadata.altitude = metadata["EXIF:GPSAltitude"]
-        new_metadata.heading = dict.get(metadata, "EXIF:GPSImgDirection", 0)
+        if new_metadata.image_width is None or new_metadata.image_height is None:
+            raise HeaderMissingError("Image width and height are missing")
+
+        try:
+            new_metadata.latitude = metadata["EXIF:GPSLatitude"]
+            new_metadata.longitude = metadata["EXIF:GPSLongitude"]
+            new_metadata.altitude = metadata["EXIF:GPSAltitude"]
+            new_metadata.heading = dict.get(metadata, "EXIF:GPSImgDirection", 0)
+        except KeyError as e:
+            raise HeaderMissingError("GPS data is missing") from e
 
         if new_metadata.heading == 0:
             logging.warning(
                 "WARNING: Heading defaulted to 0. The program will continute to run, but this may cause issues."
             )
 
-        if metadata["EXIF:GPSLatitudeRef"] == "S":
-            assert new_metadata.latitude >= 0, "Latitude is negative but ref is S"
-            new_metadata.latitude *= -1
+        try:
+            if metadata["EXIF:GPSLatitudeRef"] == "S":
+                assert new_metadata.latitude >= 0, "Latitude is negative but ref is S"
+                new_metadata.latitude *= -1
 
-        if metadata["EXIF:GPSLongitudeRef"] == "W":
-            assert new_metadata.longitude >= 0, "Longitude is negative but ref is W"
-            new_metadata.longitude *= -1
+            if metadata["EXIF:GPSLongitudeRef"] == "W":
+                assert new_metadata.longitude >= 0, "Longitude is negative but ref is W"
+                new_metadata.longitude *= -1
 
-        if metadata["EXIF:GPSImgDirectionRef"] == "M":
-            assert (
-                np.abs(new_metadata.heading) > 2 * np.pi
-            ), "Heading is in radians but we assume degrees. Please fix"
-            new_metadata.heading -= 8.0  # subtract 8deg to account for magnetic declination
+            if metadata["EXIF:GPSImgDirectionRef"] == "M":
+                assert (
+                    np.abs(new_metadata.heading) > 2 * np.pi
+                ), "Heading is in radians but we assume degrees. Please fix"
+                new_metadata.heading -= 8.0  # subtract 8deg to account for magnetic declination
+        except KeyError as e:
+            raise HeaderMissingError("GPS Direction Ref is missing") from e
 
         units_to_meter_conversion_factors = [
             None,  # this is the default value
@@ -82,17 +93,19 @@ class HeaderMetadata:
         unit_index = dict.get(metadata, "EXIF:FocalPlaneResolutionUnit", 1) - 1
         resolution_conversion_factor = units_to_meter_conversion_factors[unit_index]
 
-        assert (
-            resolution_conversion_factor is not None
-        ), "FocalPlaneResolutionUnit is None"
+        if resolution_conversion_factor is None:
+            raise HeaderMissingError("FocalPlaneResolutionUnit is missing")
 
-        focal_length = metadata["EXIF:FocalLength"] * resolution_conversion_factor
-        sensor_width = (
-            metadata["EXIF:FocalPlaneXResolution"] * resolution_conversion_factor
-        )
-        sensor_height = (
-            metadata["EXIF:FocalPlaneYResolution"] * resolution_conversion_factor
-        )
+        try:
+            focal_length = metadata["EXIF:FocalLength"] * resolution_conversion_factor
+            sensor_width = (
+                metadata["EXIF:FocalPlaneXResolution"] * resolution_conversion_factor
+            )
+            sensor_height = (
+                metadata["EXIF:FocalPlaneYResolution"] * resolution_conversion_factor
+            )
+        except KeyError as e:
+            raise HeaderMissingError("FocalLength, FocalPlaneXResolution, or FocalPlaneYResolution is missing") from e
 
         new_metadata.half_image_width_meters = new_metadata.altitude * sensor_width / focal_length
         new_metadata.half_image_height_meters = new_metadata.altitude * sensor_height / focal_length
