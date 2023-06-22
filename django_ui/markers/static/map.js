@@ -32,6 +32,25 @@ function markerPopup(layer) {
     )
 }
 
+// marker rippler animation logic
+function createRipple(markerIcon) {
+    const circle = document.createElement("span");
+    const radius = 20; // pixels
+    circle.style.width = circle.style.height = `${radius}px`;
+    const {x, y} = Array.from(CSSStyleValue.parse('transform', markerIcon.style.transform))
+                                .filter(s => s instanceof CSSTranslate)[0]
+    circle.style.left = `calc(${x.value}${x.unit} - ${radius / 2}px)`;
+    circle.style.top = `calc(${y.value}${y.unit} - ${radius / 2}px)`;
+    circle.classList.add('ripple');
+
+    markerIcon.parentNode.appendChild(circle);
+    setTimeout(() => circle.remove(), 5000);
+}
+
+const knownIds = new Set();
+let markerLayer = null;
+
+
 async function load_markers() {
     const markers_url = `/api/markers/?in_bbox=${
         map.getBounds().toBBoxString()
@@ -51,13 +70,13 @@ async function render_markers() {
     const min_radius = 10;  // pixels
 
     const markers = await load_markers();
+    
     const clusters = dbscan(markers.features.map(f => f.geometry.coordinates));
 
     const cluster_labels = new Array(markers.features.length).fill(-1);
     clusters.forEach((cluster, i) => cluster.forEach((idx) => cluster_labels[idx] = i));
-    console.log(clusters)
-    console.log(cluster_labels)
 
+    // add it as a feature so that it can be used in the popup
     markers.features.forEach((feature, i) => feature.properties.cluster = cluster_labels[i]);
 
     const heatmap_data = markers.features.map((feature) => ({
@@ -67,29 +86,40 @@ async function render_markers() {
         opacity: feature.properties.confidence / 100.,
     }));
 
-    const layers_geojson = L.geoJSON(markers)
+    if (markerLayer !== null)
+        markerLayer.removeFrom(map);
+
+    markerLayer = L.geoJSON(markers)
         .bindPopup(markerPopup)
         .addTo(map);
 
-    const dom_icons = Object.keys(layers_geojson._layers).map(key => (
+    const dom_icons = Object.keys(markerLayer._layers).map(key => (
         {
-            id: layers_geojson._layers[key].feature.id,
-            icon: layers_geojson._layers[key]._icon,
+            id: markerLayer._layers[key].feature.id,
+            icon: markerLayer._layers[key]._icon,
+            cluster: markerLayer._layers[key].feature.properties.cluster,
         }
     )).sort((a, b) => a.id - b.id);
 
+    
+    const cluster_colors = nRandomColorFilters(clusters.length);
 
-    dom_icons.forEach(({id, icon}, idx) => {
-        const cluster = cluster_labels[idx]
+    dom_icons.forEach(({id, icon, cluster}) => {
         // add class property to dom icon
         icon.classList.add(`cluster-${cluster}`);
+        prev_style = icon.getAttribute('style')
+        icon.setAttribute('style', `${prev_style}; filter: ${cluster_colors[cluster]}`)
+        
+        if (!knownIds.has(id)) {
+            knownIds.add(id);
+            icon.classList.add("new-marker");
+            createRipple(icon);
+        }
     })
     
-    console.log(layers_geojson)
-
     if(heatmap_data.length > 0)
         heatmapLayer.setData({ data: heatmap_data });
 }
 
 map.on("moveend", render_markers);
-setTimeout(render_markers, 5000);
+setInterval(render_markers, 5000);

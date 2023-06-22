@@ -9,8 +9,9 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js" crossorigin=""></script>
     <script src="https://unpkg.com/heatmap.js@2.0.5/build/heatmap.js" crossorigin=""></script>
     <script src="https://unpkg.com/heatmap.js@2.0.5/plugins/leaflet-heatmap/leaflet-heatmap.js" crossorigin=""></script>
-    <script src="https://unpkg.com/density-clustering@1.3.0/lib/DBSCAN.js" crossorigin=""></script>
+    <script src="{% static 'DBSCAN.js' %}" crossorigin=""></script>
     <script src="{% static 'clustering.js' %}" crossorigin=""></script>
+    <script src="{% static 'color.js' %}" crossorigin=""></script>
   </head>
   <body>
     <div id="map"></div>
