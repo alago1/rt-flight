@@ -168,7 +168,8 @@ async function update_table() {
     }));
 
     if (table !== null) {
-        const new_data = data.filter(t => !knownIds.has(t.id));
+        const tableIds = new Set(table.getData().map(t => t.id));
+        const new_data = data.filter(t => !tableIds.has(t.id));
 
         if (new_data.length !== 0) {
             await table.addData(new_data);
