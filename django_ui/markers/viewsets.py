@@ -8,5 +8,5 @@ from markers.serializers import MarkerSerializer
 class MarkerViewSet(viewsets.ReadOnlyModelViewSet):
     bbox_filter_field = "location"
     filter_backends = (filters.InBBoxFilter,)
-    queryset = Marker.objects.all()
+    queryset = Marker.objects.all().order_by("-id")
     serializer_class = MarkerSerializer

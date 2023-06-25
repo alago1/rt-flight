@@ -36,7 +36,10 @@ def main():
 
     img = cv2.imread(args.image)
 
-    detection_layer = DetectionLayer(args.model, engine="onnx", providers=[("CUDAExecutionProvider")])
+    kwargs = {'providers': [('CUDAExecutionProvider', 'TensorRTExecutionProvider', 'CPUExecutionProvider')]} \
+        if args.model.endswith('.onnx') else {}
+    
+    detection_layer = DetectionLayer(args.model, engine="auto", **kwargs)
     bboxes = detection_layer.run(args.image)
 
 
