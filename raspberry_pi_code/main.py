@@ -66,6 +66,8 @@ if __name__ == "__main__":
 
             try:
                 bboxes = GetBoundingBoxes(message.decode())
+                from pprint import pprint
+                pprint(bboxes)
                 socket.send_pyobj(bboxes)
             except HeaderMissingError as e:
                 logging.info(f"Header missing from image '{message.decode()}'")
@@ -76,5 +78,8 @@ if __name__ == "__main__":
                 socket.send_pyobj(DetectionError(f"File '{message.decode()}' not found"))
             except exiftool.exceptions.ExifToolException:
                 socket.send_pyobj(HeaderError(f"File '{message.decode()}' does not have valid EXIF data"))
+            except Exception as e:
+                logging.error(traceback.format_exc())
+                socket.send_pyobj(DetectionError(f"Unknown error: {str(e)}"))
     except KeyboardInterrupt:
         pass

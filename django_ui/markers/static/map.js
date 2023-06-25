@@ -16,7 +16,7 @@ map.fitWorld();
 
 
 // DBSCAN clustering setup
-const dbscan = dbscan_clustering(3, 2000);
+const dbscan = dbscan_clustering(3, 50);
 
 // UI
 function markerPopup(layer) {
@@ -63,7 +63,7 @@ async function load_markers(bbox_filter=null) {
 
 async function render_markers({skip_on_no_new=false}) {
     const metersPerPixel = 40075016.686 * Math.abs(Math.cos(map.getCenter().lat * Math.PI/180)) / Math.pow(2, map.getZoom()+8);
-    const scale = 1e3;  // increase radius to make clusters more visible
+    const scale = 5e-1;  // increase radius to make clusters more visible
     console.log(`Meters per pixel: ${metersPerPixel}`)
 
     const max_radius = 1000 / metersPerPixel; // 1km in pixels
