@@ -18,7 +18,10 @@ print("Connecting to Model Network")
 model_socket = context.socket(zmq.REQ)
 model_socket.connect("tcp://localhost:5555")
 
-img_path = "../data/dota_demo.jpg"
+# img_path = "../data/dota_demo.jpg"
+img_path = "../data/DJI_0007_copy.JPG"
+# img_path = "../data_ignore/dji0007.out.tif"
+# img_path = "../data/DJI_0007_copy.tif"
 
 model_socket.send_string(img_path)
 message = model_socket.recv()
@@ -64,8 +67,8 @@ def publisher_worker():
             ui_publisher.send(b'')
             time.sleep(0.1)
         
-        print("Connected waiting 20 seconds")
-        time.sleep(20)
+        print("Connected waiting 5 seconds")
+        time.sleep(5)
         print("Sending...")
         ui_publisher.send_json([asdict(r) for r in result])
     except KeyboardInterrupt:

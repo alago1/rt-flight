@@ -12,6 +12,8 @@ class HeaderMissingError(Exception):
 
 @dataclass
 class HeaderMetadata:
+    image_path: Optional[str] = None
+
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     altitude: Optional[float] = None
@@ -32,10 +34,12 @@ class HeaderMetadata:
 
     @staticmethod
     def read(image_path: str):
+
         with exiftool.ExifToolHelper() as et:
             metadata = et.get_metadata(image_path)[0]
 
         new_metadata = HeaderMetadata()
+        new_metadata.image_path = image_path
 
         logging.info(f"Metadata: {metadata}")
 
@@ -75,7 +79,7 @@ class HeaderMetadata:
                 assert new_metadata.longitude >= 0, "Longitude is negative but ref is W"
                 new_metadata.longitude *= -1
 
-            if metadata["EXIF:GPSImgDirectionRef"] == "M":
+            if dict.get(metadata, "EXIF:GPSImgDirectionRef", "T") == "M":
                 assert (
                     np.abs(new_metadata.heading) > 2 * np.pi
                 ), "Heading is in radians but we assume degrees. Please fix"
@@ -107,11 +111,12 @@ class HeaderMetadata:
         except KeyError as e:
             raise HeaderMissingError("FocalLength, FocalPlaneXResolution, or FocalPlaneYResolution is missing") from e
 
-        new_metadata.half_image_width_meters = new_metadata.altitude * sensor_width / focal_length
-        new_metadata.half_image_height_meters = new_metadata.altitude * sensor_height / focal_length
+        new_metadata.half_image_width_meters = new_metadata.altitude * sensor_width / focal_length / 2
+        new_metadata.half_image_height_meters = new_metadata.altitude * sensor_height / focal_length / 2
+
 
         logging.debug(f"Image width, height meters: {2 * new_metadata.half_image_width_meters}, {2 * new_metadata.half_image_height_meters}")
 
-        new_metadata.top_left, new_metadata.top_right, new_metadata.bottom_left, new_metadata.bottom_right = get_corner_coordinates(new_metadata)
+        new_metadata.top_left, new_metadata.top_right, new_metadata.bottom_right, new_metadata.bottom_left = get_corner_coordinates(new_metadata)
 
         return new_metadata

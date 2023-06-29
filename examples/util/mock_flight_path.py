@@ -12,17 +12,17 @@ def mock_flight_path(
         num_gcps,
         corner_gps_coordinates,
         altitude,
-        seed=None,
-        mock_output_dim=(600, 600)):
+        mock_output_dim=(600, 600),
+        seed=None):
     """
     Mocks the flight path of a UAV by cropping a large orthomosaic
     along a random path and returning each cropped image in sequence.
 
     :param large_orthomosaic_path: path to large orthomosaic image
-    :param seed: seed for random number generator
     :param num_gcps: number of ground control points (GCPs) on the random path
     :param corner_gps_coordinates: 2D array of GPS coordinates of the corners of the orthomosaic image
     :param mock_output_dim: 2D array of width-height dimensions of individual mock output images
+    :param seed: seed for random number generator
     """
     if seed is not None:
         np.random.seed(seed)
@@ -44,7 +44,8 @@ def mock_flight_path(
             angle,
             mock_output_dim,
             corner_gps_coordinates,
-            altitude
+            altitude,
+            large_orthomosaic_path
         )
 
 
@@ -100,7 +101,7 @@ def build_path_pixels(gcps, step_size=100):
     return path
 
 
-def create_cropped_image(image, pixel_center, angle, cropped_shape, corner_gps_coordinates, altitude):
+def create_cropped_image(image, pixel_center, angle, cropped_shape, corner_gps_coordinates, altitude, img_path):
     """
     Creates a cropped image file with EXIF metadata based on a large orthomosaic image.
 
@@ -117,15 +118,15 @@ def create_cropped_image(image, pixel_center, angle, cropped_shape, corner_gps_c
     sample = _crop_around(image, pixel_center, (cropped_diag, cropped_diag))
     rotated_sample = _center_crop(rotate(sample, -angle, reshape=False), cropped_shape)
     
-    meta = build_metadata(pixel_center, angle, image.shape, corner_gps_coordinates, altitude)
-
     tf = tempfile.NamedTemporaryFile(prefix='rtflight_', suffix=".jpg", delete=False)
     Image.fromarray(rotated_sample).save(tf.name)
+    
+    meta = build_metadata(pixel_center, angle, image.shape, corner_gps_coordinates, altitude)
+
     with ExifToolHelper() as et:
         et.set_tags([tf.name], tags=meta, params=["-P", "-overwrite_original"])
 
     return tf.name
-
 
 
 def _crop_around(image, center, dim):
@@ -150,16 +151,15 @@ def approx_gps(pixel_center, orthomosaic_shape, corner_gps_coordinates):
     :param pixel_center: 2D array of pixel location
     :param orthomosaic_shape: 2D array of width-height dimensions of orthomosaic image
     :param corner_gps_coordinates: 2D array of GPS coordinates of the corners of the orthomosaic image
-        in the order [top-left, top-right, bottom-right, bottom-left]
+        in the order [top-left, top-right, bottom-right, bottom-left]ic (used on gdal backend only)
 
     :return: 2D array of GPS coordinates of pixel location
     """
-    # d = distance(point1, point2).meters with from geopy.distance import distance
     right_vec = corner_gps_coordinates[1] - corner_gps_coordinates[0]
     down_vec = corner_gps_coordinates[3] - corner_gps_coordinates[0]
     top_left_relative_loc = right_vec * pixel_center[1] / orthomosaic_shape[1] + down_vec * pixel_center[0] / orthomosaic_shape[0]
-    return corner_gps_coordinates[0] + top_left_relative_loc
-
+    gps_linear = corner_gps_coordinates[0] + top_left_relative_loc
+    return gps_linear
 
 def build_metadata(
         pixel_center,

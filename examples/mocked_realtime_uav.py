@@ -1,17 +1,13 @@
 import traceback
-import pathlib
 import sys
 import io
 import pickle
 from pprint import pprint
-import time
-import threading
-from dataclasses import asdict
-from queue import SimpleQueue
 
 import zmq
 import numpy as np
 
+from util.zmq_util import message_queue, start_server, server_join
 from util.mock_flight_path import mock_flight_path
 
 # symlinked from raspberry_pi_code
@@ -29,66 +25,18 @@ model_socket.connect("tcp://localhost:5555")
 PUBLISHER_PORT = 5556
 SYNC_PORT = 5557
 
-# number of subscribers to wait for before sending messages
-NUM_SUBSCRIBERS = 1
-
-connected_subs = 0
-
-message_queue = SimpleQueue()
+start_server(context, min_subs=1, publisher_port=PUBLISHER_PORT, sync_port=SYNC_PORT)
 
 
-def publisher_worker():
-    try:
-        ui_publisher = context.socket(zmq.PUB)
-        ui_publisher.sndhwm = 1100000  # set high water mark so messages aren't dropped
-        ui_publisher.bind(f"tcp://*:{PUBLISHER_PORT}")
-
-        while connected_subs < NUM_SUBSCRIBERS:
-            ui_publisher.send(b'')
-            time.sleep(0.1)
-        
-        while True:
-            if not message_queue.empty():
-                ui_publisher.send_json([asdict(r) for r in message_queue.get()])
-    except KeyboardInterrupt:
-        pass
-    
-    ui_publisher.close()
+DATASET_CORNER_GPS_COORDS = np.array([
+    (12.86308254761559, 77.5151947517078),  # top left
+    (12.863010715187013, 77.52267023737696),  # top right
+    (12.858936436333265, 77.52262951527761),  # bottom right
+    (12.859008245256549, 77.5151541499705)  # bottom left
+])
 
 
-def syncservice_worker():
-    global connected_subs
-
-    syncservice = context.socket(zmq.REP)
-    syncservice.bind(f"tcp://*:{SYNC_PORT}")
-
-    try:
-        while True:
-            syncservice.recv()
-            connected_subs += 1
-            print(f"Connected {connected_subs}/{NUM_SUBSCRIBERS} subscriber(s)")
-            syncservice.send(b'')
-    except KeyboardInterrupt:
-        pass
-
-    syncservice.close()
-
-
-threads = []
-for worker in (publisher_worker, syncservice_worker):
-    t = threading.Thread(target=worker)
-    t.start()
-    threads.append(t)
-
-
-DATASET_TOP_LEFT_GPS = np.array((12.86308254761559, 77.5151947517078))
-DATASET_TOP_RIGHT_GPS = np.array((12.863010715187013, 77.52267023737696))
-DATASET_BOT_LEFT_GPS = np.array((12.859008245256549, 77.5151541499705))
-DATASET_BOT_RIGHT_GPS = np.array((12.858936436333265, 77.52262951527761))
-DATASET_CORNER_GPS_COORDS = np.array([DATASET_TOP_LEFT_GPS, DATASET_TOP_RIGHT_GPS, DATASET_BOT_RIGHT_GPS, DATASET_BOT_LEFT_GPS])
-
-
-for img_path in mock_flight_path("../data/Blore_Clean.jpg", 5, DATASET_CORNER_GPS_COORDS, 100.5):
+for img_path in mock_flight_path("../data_ignore/Blore_Clean.tif", 5, DATASET_CORNER_GPS_COORDS, 100.5, seed=42):
     
     model_socket.send_string(img_path)
     message = model_socket.recv()
@@ -115,9 +63,6 @@ for img_path in mock_flight_path("../data/Blore_Clean.jpg", 5, DATASET_CORNER_GP
         sys.exit(1)
 
 
-for t in threads:
-    t.join()
-
-
+server_join()
 model_socket.close()
 context.term()
