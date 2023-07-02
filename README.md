@@ -12,139 +12,173 @@
 ```
 root/
 ├── data/  # Data for the simulator
-    ├── Blore_Clean.jpg
-    └── ...
+│    ├── Blore_Clean.jpg
+│    └── ...
 ├── yolo/  # Model weights and config
-    ├── yolov3-aerial.cfg
-    ├── yolov3-aerial.weights
-    └── ...
+│    ├── yolov3-aerial.cfg
+│    ├── yolov3-aerial.weights
+│    └── ...
 ├── examples/  # Runnable examples
-    ├── model_sender.ipynb
-    ├── file_sender.py
-    └── ...
-├── raspberry_pi_code/  # Code usable in a Raspberry Pi
-    ├── model_network.py
-    ├── file_sender.py
-    ├── protos/  # Protobuf files
-    │   ├── messaging.proto
-    │   └── ...
-    └── ...
-├── realtime_ui/  # Code for the UI
-    ├── data_receiver.py
-    ├── network.py
-    ├── protos/  # Protobuf files
-    │   ├── messaging.proto
-    │   └── ...
-    └── ...
-├── requirements.txt
+│    ├── util/
+│    ├── mocked_realtime_uav.py
+│    └── ...
+├── server/  # Code usable in a Raspberry Pi
+│    ├── engines/
+│    ├── layers/
+│    ├── models/
+│    ├── tools/
+│    │   ├── visualizer.py
+│    │   ├── file_sender.py
+│    │   └── ...
+│    ├── main.py
+│    ├── requirements.txt
+│    └── ...
+├── django_ui/  # Code for the UI
+│    ├── django_ui/
+│    ├── markers/
+│    ├── manage.py
+│    └── requirements.txt
 └── ...
 ```
 
 ## Setup before using
-You may want to the `/data` folder at the root with the appropriate images. The model_sender notebook makes use of the Blore_Clean geotiff image which can be found [here](https://drive.google.com/file/d/14mJcI-_crVwy95-pAr1K8nYJDyK99zh5/view?usp=share_link). Additionally, we make the use of [YoloV3 Darknet](https://github.com/jekhor/darknet) fine-tuned to aerial imagery as the detection model for our simulation.
+You may want add to the `/data` folder at the root with the appropriate images. The mocked simulation makes use of the Blore_Clean geotiff image which can be found [here](https://drive.google.com/file/d/14mJcI-_crVwy95-pAr1K8nYJDyK99zh5/view?usp=share_link). Additionally, we make the use of [YoloV3 Darknet](https://github.com/jekhor/darknet) fine-tuned to aerial imagery as the detection model by default.
 
-The weights for these models can be found here [here](https://drive.google.com/file/d/1LyWvsoPmmPM9is0TmDmCE5vddXZLXYK6/view?usp=share_link). Add them to the `yolo/` folder in the root directory. We require "yolov3-aerial.weights" and "yolov3-aerial.cfg" (provided) files.
+For this project we do not support the darknet model directly. You can find a keras h5 file converted from the darknet model [here](https://drive.google.com/file/d/1BlBvoZ2tIgFhMUnHYLhZB6-nmU6WrSHB/view?usp=sharing). We provide detailed instructions of how to convert from keras to tflite, edge-tpu, and onnx on `yolo/keras2tflite.ipynb` and `yolo/keras2onnx.ipynb`. Other formats, such as tensorrt, can be converted to from onnx.
+
+<details>
+
+<summary>
+(Optional) Instructions if you want to convert the Darknet model yourself
+</summary>
+
+The weights for the Darknet model can be found here [here](https://drive.google.com/file/d/1LyWvsoPmmPM9is0TmDmCE5vddXZLXYK6/view?usp=share_link). Add them to the `yolo/` folder in the root directory. You will require "yolov3-aerial.weights" and "yolov3-aerial.cfg" (provided) files.
 
 If you're using a different model (for instance [YoloV3-tiny](https://github.com/smarthomefans/darknet-test) on low-memory devices), please add the weights and config files
-to the `yolo/` folder and change the appropriate variables in the `model_sender.ipynb` and `model_network.py`.
+to the `yolo/` folder.
 
-### **Install Dependencies**
+This [sample](https://github.com/NVIDIA/TensorRT/blob/main/samples/python/yolov3_onnx/yolov3_to_onnx.py) was helpful in converting the model to Onnx.
 
-OS: Ubuntu 22.04.2.
-Python version: 3.10.6
+</details>
+
+## **Installation**
+
+Tested on: Ubuntu 22.04, Python 3.10
+
+We recommend using a virtual environment to install the dependencies.
+```bash
+cd rt-flight
+python3 -m venv venv
+source venv/bin/activate
+```
+
+By default, we use GDAL to compute the gps coordinates but we also support a Geopy backend if you don't want to install that dependency on the server-side (client-side still needs it).
+```bash
+# install GDAL (optional on server-side)
+apt install gdal-bin
+apt install libgdal-dev
+pip install gdal==3.7.0  # python bindings
+```
+
+Install server-side (`server/`) dependencies:
 
 ```bash
+# install server-side dependencies
+apt install libimage-exiftool-perl
+
+cd server
+pip install -r 'requirements.txt'
+```
+In addition to the above dependencies, you must install a backend for running the detection model. The supported backends are `tflite`, `onnx`, `coral`, and `tensorrt`. Follow the instructions for the backend you want to use below.
+
+<details>
+<summary>
+TensorFlow Lite
+</summary>
+
+```bash
+pip install tflite_runtime
+```
+</details>
+<details>
+<summary>
+Onnx GPU Runtime
+</summary>
+
+```bash
+pip install onnruntime_gpu
+```
+</details>
+
+<details>
+<summary>
+PyCoral
+</summary>
+
+```bash
+pip install tflite_runtime
+
+# https://coral.ai/docs/accelerator/get-started/#runtime-on-linux
+apt install python3-pycoral
+pip install --extra-index-url https://google-coral.github.io/py-repo/ pycoral~=2.0
+```
+
+</details>
+
+<details>
+<summary>
+TensorRT
+</summary>
+
+Varies from system to system. Please follow the instructions [here](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html).
+</details>
+
+### **Client-side (Ground Station)**
+The client-side (`django_ui/`) is a GeoDjango application that requires additional dependencies. We recommend following the [GeoDjango installation guide](https://docs.djangoproject.com/en/3.2/ref/contrib/gis/install/#installing-geodjango) first. We've tested with the SpatialLite database.
+
+```bash
+# install client-side dependencies
+cd django_ui
 pip install -r 'requirements.txt'
 
-apt install libimage-exiftool-perl
-apt install python3-tk
-apt install libgl1
-apt install libglib2.0-0
+# init database if not already done
+python manage.py shell -c "import django;django.db.connection.cursor().execute('SELECT InitSpatialMetaData(1);')"
+python manage.py migrate
 ```
 
 ***
 
 
-## Using the Simulator
+## Running the code
 
-Running the simulation requires a specific order in which to launch the programs in. The network.py script acts as an intermediary that emulates the transmission of a detection via Mavlink to the Ground Station and to the UI. As such, network.py would be started first, followed by data_receiver.py to start up the UI. Finally, the model_sender.ipynb notebook will be run. 
+Running the simulation requires running multiple programs. For single image files we use the `file_sender` script acts as an intermediary that emulates the transmission of a detection to the Ground Station and to the UI. We can also run a simulation of a flying uav with the `mocked_realtime_uav` script instead.
+
+Run each of the following in a separate terminal.
 
 
-### **Start the Network**
+### **Start the backend**
 
 ```bash
-python realtime_ui/network.py
+python -m server.main
 ```
 
 ### **Start the UI**
 
-Create a new terminal/command line instance to launch the UI. 
-
 ```bash
-python realtime_ui/data_receiver.py
+python django_ui/manage.py runserver
+# you should now be able to access the UI on your browser at localhost:8000/markers/map
 ```
 
-### **Run the Model_Sender Notebook**
-
-While we don't have a great way to run a Jupyter notebook from command line, the "Run All" button within **model_sender.ipynb** would be adequate to start the simulator.
-
-
-### **Example Run for Simulator**
+### **Run the intermediary script**
 
 ```bash
-# in one terminal instance
-python realtime_ui/network.py
-# in another terminal instance
-python realtime_ui/data_receiver.py
+# for single image files (more akin to the real-world scenario)
+python -m server.tools.file_sender -i <image file path>
 
-# once both are running, run the full model_sender.ipynb notebook
+# for simulated uav (images are generated from orthomosaic random path)
+python examples/mocked_realtime_uav.py
 ```
-
-***
 
 ## Run Production Code
 
-This is the code within the `/raspberry_pi_code` directory that serves as a working version of the code that is running on CUSP, a custom-built thermal and RGB sensor package. More information about this project can be found [here](https://github.com/JesseChin/CUSP).
-
-### **Run the Model Network
-
-Similarly to the simulator, model_network.py works like network.py, with the difference being that it awaits a file path input from the use in the form of a procedure call, then runs the detection model on it and sends back the corresponding coordinates and information. By default, this server will be running on port 50051, and the log file location will be in the same directory as model_network.py named "log.txt".
-
-```bash
-python raspberry_pi_code/model_network <port number; default = 50051> <log file path; default = "log.txt">
-```
-
-### **Run the File Sender**
-
-Once the model network is running, you can run detections on it by using the file_sender.py script to send an image file path and print out the resulting coordinates and information. Make sure to change the "img_path" variable within the script to your desired image to ensure that the program works as intended. 
-
-```
-python raspberry_pi_code/file_sender.py
-```
-
-### **Full Example**
-
-```
-#Run model_network.py on port 1004 and set logs to the root directory
-python raspberry_pi_code/model_network.py 1004 "../logs.txt"
-
-#Run file sender in a separate terminal instance
-python raspberry_pi_code/file_sender.py
-```
-
-***
-
-## Compile gRPC Protobuf (if needed)
-
-In the case of issues with gRPC and the protos files, you can use the following to recompile the proto files for use within the model_network.py program:
-
-`cd raspberry_pi_code/protos && python -m grpc_tools.protoc -I../protos --python_out=. --pyi_out=. --grpc_python_out=. messaging.proto`
-
-***
-
-## Warning
-
-Graceful termination has not been properly integrated into network.py nor model_network.py so ensure that the process corresponding to either of these is properly killed, as opposed to suspended. Failure to do so, will cause issues with establishing a gRPC connection between the other components to the respective network program.
-
-
-***
+`server` is a working version of the code that is running on CUSP, a custom-built thermal and RGB sensor package. More information about this project can be found [here](https://github.com/JesseChin/CUSP).
