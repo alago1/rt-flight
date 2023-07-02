@@ -1,0 +1,9 @@
+exif==1.6.0
+GDAL==3.7.0
+geopy==2.3.0
+opencv_python==4.7.0.72
+Pillow==9.5.0
+PyExifTool==0.5.5
+scipy==1.10.0
+GDAL==3.7.0
+pyzmq==25.1.0

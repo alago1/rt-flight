@@ -3,6 +3,7 @@ import sys
 import io
 import pickle
 from pprint import pprint
+from pathlib import Path
 
 import zmq
 import numpy as np
@@ -10,9 +11,11 @@ import numpy as np
 from util.zmq_util import message_queue, start_server, server_join
 from util.mock_flight_path import mock_flight_path
 
-# symlinked from raspberry_pi_code
-from models.error import DetectionError, HeaderError
-from models.bbox import BBox
+project_path = Path(__file__).parent.parent
+sys.path.append(str(project_path))
+
+from server.models.error import DetectionError, HeaderError
+from server.models.bbox import BBox
 
 
 context = zmq.Context()
@@ -36,7 +39,7 @@ DATASET_CORNER_GPS_COORDS = np.array([
 ])
 
 
-for img_path in mock_flight_path("../data_ignore/Blore_Clean.tif", 5, DATASET_CORNER_GPS_COORDS, 100.5, seed=42):
+for img_path in mock_flight_path(project_path / "data/Blore_Clean.tif", 5, DATASET_CORNER_GPS_COORDS, 100.5, seed=42):
     
     model_socket.send_string(img_path)
     message = model_socket.recv()

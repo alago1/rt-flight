@@ -25,3 +25,6 @@ yolov3.h5
 *.weights
 *.names
 *.tif
+
+# database files
+*.sqlite3

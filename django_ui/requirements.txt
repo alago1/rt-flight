@@ -7,3 +7,4 @@ sqlparse==0.4.4
 typing_extensions==4.6.3
 pyzmq==25.1.0
 pytz==2023.3
+GDAL==3.4.1
