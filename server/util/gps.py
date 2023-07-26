@@ -24,7 +24,8 @@ def pixel_to_gps(metadata: HeaderMetadata, pixel, backend="gdal"):
     if backend == "gdal":
         from ..util.gps_gdal import pixel_to_wgs84
         corner_gps = (metadata.top_left, metadata.top_right, metadata.bottom_right, metadata.bottom_left)
-        return pixel_to_wgs84(metadata.image_path, pixel, corner_gps)
+        image_shape = (metadata.image_height, metadata.image_width)
+        return pixel_to_wgs84(image_shape, pixel, corner_gps)
 
     y, x = pixel  # x: cols, y: rows
 

@@ -47,6 +47,14 @@ body {
   animation: marker-popin 10s !important;
 } */
 
+.cluster--1 {
+  opacity: 0.3;
+}
+
+.leaflet-marker-shadow {
+  opacity: 0;
+}
+
 span.ripple {
   position: absolute;
   border-radius: 50%;

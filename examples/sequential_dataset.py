@@ -1,5 +1,6 @@
 import traceback
 import sys
+import os
 import io
 import pickle
 from pprint import pprint
@@ -9,7 +10,6 @@ import zmq
 import numpy as np
 
 from util.zmq_util import message_queue, start_server, server_join
-from util.mock_flight_path import mock_flight_path
 
 project_path = Path(__file__).parent.parent
 sys.path.append(str(project_path))
@@ -31,17 +31,13 @@ SYNC_PORT = 5557
 start_server(context, min_subs=1, publisher_port=PUBLISHER_PORT, sync_port=SYNC_PORT)
 
 
-DATASET_CORNER_GPS_COORDS = np.array([
-    (12.86308254761559, 77.5151947517078),  # top left
-    (12.863010715187013, 77.52267023737696),  # top right
-    (12.858936436333265, 77.52262951527761),  # bottom right
-    (12.859008245256549, 77.5151541499705)  # bottom left
-])
+images_folder = project_path / "data_ignore" / "sequential_with_exif"
+images = [images_folder / img for img in os.listdir(str(images_folder)) if img.lower().endswith(".jpg")]
+images.sort(key=lambda x: int(str(x)[-8:-4]))  # hack to sort by image number
 
-
-for img_path in mock_flight_path(project_path / "data/Blore_Clean.tif", 5, DATASET_CORNER_GPS_COORDS, 100.5, seed=42):
-    
-    model_socket.send_string(img_path)
+for i, img_path in enumerate(images):
+    print(f"Sending image {i + 1} of {len(images)}: {img_path}")
+    model_socket.send_string(str(img_path))
     message = model_socket.recv()
 
     try:
@@ -64,7 +60,6 @@ for img_path in mock_flight_path(project_path / "data/Blore_Clean.tif", 5, DATAS
         print("Received unknown error while trying to parse message:")
         print(traceback.format_exc())
         sys.exit(1)
-
 
 server_join()
 model_socket.close()

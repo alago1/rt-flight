@@ -10,6 +10,7 @@ class OnnxEngine(AbstractEngine):
     
     def load_model(self, **kwargs):
         session = onnxruntime.InferenceSession(self.model_path, **kwargs)
+        self.input_name = session.get_inputs()[0].name
         return session
 
     def get_input_shape(self):
@@ -17,4 +18,4 @@ class OnnxEngine(AbstractEngine):
         return (height, width)
 
     def __call__(self, input):
-        return self.model.run(None, {"image_input": input})
+        return self.model.run(None, {self.input_name: input})

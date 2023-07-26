@@ -16,7 +16,7 @@ map.fitWorld();
 
 
 // DBSCAN clustering setup
-const dbscan = dbscan_clustering(3, 50);
+const dbscan = dbscan_clustering(3, 10);  // min 3pts per cluster, 20m radius
 
 // UI
 function markerPopup(layer) {

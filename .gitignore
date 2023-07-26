@@ -28,3 +28,6 @@ yolov3.h5
 
 # database files
 *.sqlite3
+
+# virtual environments
+venv/

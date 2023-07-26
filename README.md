@@ -67,7 +67,7 @@ Tested on: Ubuntu 22.04, Python 3.10
 
 We recommend using a virtual environment to install the dependencies.
 ```bash
-cd rt-flight
+cd rt-flight/server
 python3 -m venv venv
 source venv/bin/activate
 ```
@@ -86,7 +86,7 @@ Install server-side (`server/`) dependencies:
 # install server-side dependencies
 apt install libimage-exiftool-perl
 
-cd server
+# inside rt-flight/server
 pip install -r 'requirements.txt'
 ```
 In addition to the above dependencies, you must install a backend for running the detection model. The supported backends are `tflite`, `onnx`, `coral`, and `tensorrt`. Follow the instructions for the backend you want to use below.
@@ -137,8 +137,12 @@ Varies from system to system. Please follow the instructions [here](https://docs
 The client-side (`django_ui/`) is a GeoDjango application that requires additional dependencies. We recommend following the [GeoDjango installation guide](https://docs.djangoproject.com/en/3.2/ref/contrib/gis/install/#installing-geodjango) first. We've tested with the SpatialLite database.
 
 ```bash
+# create client-side virtual env
+cd rt-flight/django_ui
+python3 -m venv venv
+source venv/bin/activate
+
 # install client-side dependencies
-cd django_ui
 pip install -r 'requirements.txt'
 
 # init database if not already done

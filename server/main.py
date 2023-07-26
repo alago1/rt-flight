@@ -51,11 +51,11 @@ if __name__ == "__main__":
     setup_logger()
 
     model_path = "yolo/yolov3-416.onnx"
-    # model_path = "yolo/yolov3-416.trt"
+    # model_path = "yolo/yolov3-finetuned.onnx"
 
     parallel_layer = ParallelLayer([
         HeaderReader(),
-        DetectionLayer(model_path, engine="onnx", providers=[("CUDAExecutionProvider")])
+        DetectionLayer(model_path, engine="onnx", providers=[("CUDAExecutionProvider")], min_confidence=0.3)
     ])
     gps_translation_layer = GPSTranslationLayer()
 
@@ -73,10 +73,13 @@ if __name__ == "__main__":
                 logging.info(f"Header missing from image '{message.decode()}'")
                 socket.send_pyobj(HeaderError(f"Header missing from image '{message.decode()}': {str(e)}"))
             except UnicodeDecodeError:
+                logging.error("Cannot decode path message.")
                 socket.send_pyobj(DetectionError("User cannot decode path message. Is it using UTF-8?"))
             except FileNotFoundError:
+                logging.error(f"File '{message.decode()}' not found")
                 socket.send_pyobj(DetectionError(f"File '{message.decode()}' not found"))
             except exiftool.exceptions.ExifToolException:
+                logging.error(f"Invalid exif data found in file {message.decode()}")
                 socket.send_pyobj(HeaderError(f"File '{message.decode()}' does not have valid EXIF data"))
             except Exception as e:
                 logging.error(traceback.format_exc())

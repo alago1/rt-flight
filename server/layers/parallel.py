@@ -1,21 +1,29 @@
 import multiprocessing as mp
 from typing import Any, Sequence, TypeVar, List
+import logging
 
 from .layer import PipelineLayer
 
 T = TypeVar("T", bound='PipelineLayer')
 
-def run_layer(layer: T, q: mp.Queue, args):
-    q.put(layer.run(*args))
+def run_layer(layer: T, output_queue: mp.Queue, error_queue: mp.Queue, args):
+    try:
+        output_queue.put(layer.run(*args))
+        error_queue.put(None)
+    except Exception as e:
+        output_queue.put(None)
+        error_queue.put(e)
 
 
 class ParallelLayer(PipelineLayer):
     layers: Sequence[T] = []
-    queues: Sequence[mp.Queue] = []
+    outputs: Sequence[mp.Queue] = []
+    errors: Sequence[mp.Queue] = []
 
     def __init__(self, layers: Sequence[T]):
         self.layers = layers
-        self.queues = [mp.Queue() for _ in layers]
+        self.outputs = [mp.Queue() for _ in layers]
+        self.errors = [mp.Queue() for _ in layers]
 
 
     def run(self, layer_args: Sequence[Any], share_input: bool = False):
@@ -35,13 +43,19 @@ class ParallelLayer(PipelineLayer):
             layer_args = [layer_args for _ in self.layers]
 
         processes: List[mp.Process] = []
-        for layer, q, args in zip(self.layers, self.queues, layer_args):
-            p = mp.Process(target=run_layer, args=(layer, q, args))
+        for layer, out, err, args in zip(self.layers, self.outputs, self.errors, layer_args):
+            p = mp.Process(target=run_layer, args=(layer, out, err, args))
             p.start()
             processes.append(p)
         
         for p in processes:
             p.join()
         
-        outputs = [q.get() for q in self.queues]
+        outputs = [q.get() for q in self.outputs]
+        errors = [e.get() for e in self.errors]
+
+        if any(errors):
+            logging.error(f"Errors occurred while running parallel layers: {errors}")
+            raise [e for e in errors if e is not None][0]  # raises the first error, logs all of them
+
         return outputs

@@ -1,7 +1,7 @@
 # Based on implementation from: https://github.com/david8862/keras-YOLOv3-model-set/blob/master/common/yolo_postprocess_np.py
 
 import copy
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import numpy as np
 import PIL.Image
@@ -160,7 +160,7 @@ def handle_predictions(
 
     # Boxes, Classes and Scores returned from NMS
     n_boxes, n_classes, n_scores = nms_boxes(
-        boxes, classes, scores, iou_threshold, confidence=confidence
+        boxes, classes, scores, iou_threshold
     )
 
     if n_boxes:
@@ -179,11 +179,7 @@ def nms_boxes(
     boxes,
     classes,
     scores,
-    iou_threshold,
-    confidence=0.1,
-    is_soft=False,
-    use_exp=False,
-    sigma=0.5,
+    iou_threshold
 ):
     nboxes, nclasses, nscores = [], [], []
     for c in set(classes):
@@ -348,6 +344,7 @@ def postprocess_net_output(
     confidence: float = 0.1,
     iou_threshold: float = 0.4,
     max_boxes: int = 100,
+    num_classes: Optional[int] = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Post process the output of the network to get the final bounding boxes
@@ -362,7 +359,8 @@ def postprocess_net_output(
     """
     net_out.sort(key=lambda x: x.shape[1])
 
-    num_classes = 20  # TODO: should get this from the model instead
+    if num_classes is None:
+        num_classes = net_out[0].shape[-1] // 3 - 5
 
     boxes = [
         decode_net_output(
