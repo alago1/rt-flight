@@ -29,9 +29,9 @@ def pipeline(image_path: str, model_path: str):
         if model_path.endswith('.onnx') else {}
     
     image_processing_layer = ParallelLayer([
-        HeaderReader(),
         DetectionLayer(model_path, engine="auto", **kwargs),
-    ])
+        HeaderReader(),
+    ], thread_first=True)
     gps_translation_layer = GPSTranslationLayer()
 
     header, bboxes = image_processing_layer.run((image_path,), share_input=True)

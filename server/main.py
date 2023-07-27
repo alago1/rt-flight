@@ -54,9 +54,9 @@ if __name__ == "__main__":
     # model_path = "yolo/yolov3-finetuned.onnx"
 
     parallel_layer = ParallelLayer([
+        DetectionLayer(model_path, engine="onnx", providers=[("CUDAExecutionProvider")], min_confidence=0.3),
         HeaderReader(),
-        DetectionLayer(model_path, engine="onnx", providers=[("CUDAExecutionProvider")], min_confidence=0.3)
-    ])
+    ], thread_first=True)
     gps_translation_layer = GPSTranslationLayer()
 
     try:
