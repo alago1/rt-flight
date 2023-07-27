@@ -1,6 +1,7 @@
 import multiprocessing as mp
-from typing import Any, Sequence, TypeVar, List
+from typing import Any, Sequence, TypeVar, List, Union
 import logging
+import threading
 
 from .layer import PipelineLayer
 
@@ -20,10 +21,16 @@ class ParallelLayer(PipelineLayer):
     outputs: Sequence[mp.Queue] = []
     errors: Sequence[mp.Queue] = []
 
-    def __init__(self, layers: Sequence[T]):
+    def __init__(self, layers: Sequence[T], thread_first=False):
+        """
+        layers: Sequence of layers to be executed in parallel
+        thread_first: If true, will execute the first layer on a thread
+        """
+
         self.layers = layers
         self.outputs = [mp.Queue() for _ in layers]
         self.errors = [mp.Queue() for _ in layers]
+        self.thread_first = thread_first
 
 
     def run(self, layer_args: Sequence[Any], share_input: bool = False):
@@ -36,14 +43,27 @@ class ParallelLayer(PipelineLayer):
         In this case, layer_args (a, b) will be passed to each layer
         (i.e. layer1.run(a, b) and layer2.run(a, b)).
 
+        By default, the first layer is run in a thread
+
         Returns a list of outputs from each layer in the same order as they were passed in.
         """
 
-        if share_input:
+        if share_input or len(self.layers) == 1:
             layer_args = [layer_args for _ in self.layers]
 
-        processes: List[mp.Process] = []
-        for layer, out, err, args in zip(self.layers, self.outputs, self.errors, layer_args):
+        processes: List[Union[mp.Process, threading.Thread]] = []
+
+        layers, out_queues, error_queues, args = self.layers, self.outputs, self.errors, layer_args
+
+        # if using threads first, run the first layer on a thread
+        if self.thread_first:
+            t = threading.Thread(target=run_layer, args=(layers[0], out_queues[0], error_queues[0], args[0]))
+            t.start()
+            processes.append(t)
+
+            layers, out_queues, error_queues, args = layers[1:], out_queues[1:], error_queues[1:], args[1:]
+
+        for layer, out, err, args in zip(layers, out_queues, error_queues, args):
             p = mp.Process(target=run_layer, args=(layer, out, err, args))
             p.start()
             processes.append(p)

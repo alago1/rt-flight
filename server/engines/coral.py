@@ -19,6 +19,15 @@ class CoralEngine(AbstractEngine):
         return common.input_size(self.model)[::-1]  # (height, width)
 
     def __call__(self, input):
+        if len(input.shape) > 3:
+            input = input.squeeze()
+        
+        if np.issubdtype(input.dtype, np.floating):
+            input = 255 * input
+        
+        if input.dtype != np.uint8:
+            input = input.astype(np.uint8)
+
         common.set_input(self.model, input)
         self.model.invoke()
         output_details = self.model.get_output_details()

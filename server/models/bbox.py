@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List
 
 
-@dataclass
+@dataclass(slots=True)
 class BBox:
     latitude: float
     longitude: float 
@@ -10,6 +10,6 @@ class BBox:
     confidence: float
 
 
-@dataclass
+@dataclass(slots=True)
 class BBoxes:
     bboxes: List[BBox]
