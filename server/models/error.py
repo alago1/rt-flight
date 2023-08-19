@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 
 
-@dataclass(slots=True)
+@dataclass
 class DetectionError:
     error_msg: str
 
 
-@dataclass(slots=True)
+@dataclass
 class HeaderError:
     error_msg: str

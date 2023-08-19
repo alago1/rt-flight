@@ -5,6 +5,7 @@ import io
 import pickle
 from pprint import pprint
 from pathlib import Path
+import time
 
 import zmq
 import numpy as np
@@ -15,7 +16,7 @@ project_path = Path(__file__).parent.parent
 sys.path.append(str(project_path))
 
 from server.models.error import DetectionError, HeaderError
-from server.models.bbox import BBox
+from server.models.bbox import BBox, BBoxes
 
 
 context = zmq.Context()
@@ -35,16 +36,21 @@ images_folder = project_path / "data_ignore" / "sequential_with_exif"
 images = [images_folder / img for img in os.listdir(str(images_folder)) if img.lower().endswith(".jpg")]
 images.sort(key=lambda x: int(str(x)[-8:-4]))  # hack to sort by image number
 
+time_metrics = []
+
 for i, img_path in enumerate(images):
     print(f"Sending image {i + 1} of {len(images)}: {img_path}")
+    s = time.perf_counter()
     model_socket.send_string(str(img_path))
     message = model_socket.recv()
+    e = time.perf_counter()
+    time_metrics.append(e-s)
+    print(f"Image {i+1} end-to-end time: {1000*(e-s):.1f}ms")
 
     try:
         result = pickle.load(io.BytesIO(message))
 
-        if isinstance(result, list):
-            # result is a list of BBox objects
+        if isinstance(result, BBoxes):
             message_queue.put(result)
             pprint(result)
         elif isinstance(result, DetectionError):
@@ -53,6 +59,7 @@ for i, img_path in enumerate(images):
             print(f"Received Header Error: {result.error_msg}")
         else:
             print("Received unknown error")
+            print(result)
     except pickle.UnpicklingError:
         print("Could not unpickle message")
         sys.exit(1)
@@ -60,6 +67,12 @@ for i, img_path in enumerate(images):
         print("Received unknown error while trying to parse message:")
         print(traceback.format_exc())
         sys.exit(1)
+
+avg_time = np.mean(time_metrics)
+std_dev = np.std(time_metrics)
+print(f"Time average: {1000*avg_time}ms")
+print(f"Standard deviation: {1000*std_dev}ms")
+
 
 server_join()
 model_socket.close()

@@ -1,4 +1,5 @@
 import tflite_runtime.interpreter as tflite
+import numpy as np
 
 from .engine import AbstractEngine
 
@@ -17,11 +18,24 @@ class TfliteEngine(AbstractEngine):
         _, height, width, _ = self.model.get_input_details()[0]["shape"]
         return (height, width)
 
-    def __call__(self, input):
+    def __call__(self, input):        
+        if np.issubdtype(input.dtype, np.floating):
+            input = 255 * input
+        
+        if input.dtype != np.uint8:
+            input = input.astype(np.uint8)
+
         tensor_index = self.model.get_input_details()[0]["index"]
         self.model.set_tensor(tensor_index, input)
         self.model.invoke()
         output_details = self.model.get_output_details()
-        output = [self.model.get_tensor(output_details[i]["index"]) for i in range(len(output_details))]
 
-        return output
+        outputs = []
+        for i in range(len(output_details)):
+            out = self.model.get_tensor(output_details[i]['index'])
+            scale, zero_point = dict.get(output_details[i], 'quantization', (1, 0))
+            out = (out.astype(np.float32) - zero_point) * scale
+
+            outputs.append(out)
+
+        return outputs

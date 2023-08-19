@@ -23,7 +23,7 @@ def configure_zmq(address, port):
     subscriber.setsockopt(zmq.SUBSCRIBE, b'')
 
     print(f"Syncclient connecting to tcp://{address}:{port+1}")
-    syncclient.connect("tcp://localhost:5557")
+    syncclient.connect(f"tcp://{address}:{port+1}")
 
 
 def receive_messages():
@@ -43,9 +43,9 @@ def receive_messages():
             json_msg = json.loads(msg)
             logging.info(f"Received message: {json_msg}")
 
-            for bbox in json_msg:
+            for i, bbox in enumerate(json_msg['bboxes']):
                 marker = Marker()
-                marker.name = 'test name'
+                marker.name = f"{json_msg['source']}:{i}"
                 marker.location = Point(bbox['longitude'], bbox['latitude'], srid=4326)  # using srid=4326 for WGS84
                 marker.confidence = bbox['confidence']
                 marker.radius = bbox['radius']

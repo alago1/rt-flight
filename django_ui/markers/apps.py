@@ -13,8 +13,8 @@ class MarkersConfig(AppConfig):
     def ready(self):
         from .zmq_utils import configure_zmq, receive_messages
 
-        configure_zmq(settings.ZMQ_ADDRESS, settings.ZMQ_PORT)
-        worker_thread = threading.Thread(target=receive_messages)
         if os.environ.get("RUN_MAIN", None) == "true":
+            configure_zmq(settings.ZMQ_ADDRESS, settings.ZMQ_PORT)
+            worker_thread = threading.Thread(target=receive_messages)
             print("Starting zmq worker thread")
             worker_thread.start()

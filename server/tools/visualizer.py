@@ -25,13 +25,13 @@ def parse_args():
 
 
 def pipeline(image_path: str, model_path: str):
-    kwargs = {'providers': [('CUDAExecutionProvider', 'TensorRTExecutionProvider', 'CPUExecutionProvider')]} \
+    kwargs = {'providers': [('CUDAExecutionProvider', 'CPUExecutionProvider')]} \
         if model_path.endswith('.onnx') else {}
     
     image_processing_layer = ParallelLayer([
-        DetectionLayer(model_path, engine="auto", **kwargs),
         HeaderReader(),
-    ], thread_first=True)
+        DetectionLayer(model_path, engine="auto", **kwargs),
+    ], use_threads=True)
     gps_translation_layer = GPSTranslationLayer()
 
     header, bboxes = image_processing_layer.run((image_path,), share_input=True)

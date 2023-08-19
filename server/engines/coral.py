@@ -13,6 +13,13 @@ class CoralEngine(AbstractEngine):
     def load_model(self, **kwargs):
         model = edgetpu.make_interpreter(self.model_path, **kwargs)
         model.allocate_tensors()
+        
+        # run model once on random input to fully load weights
+        input_shape = common.input_size(model)[::-1]
+        t = 255 * np.random.random((*input_shape, 3))
+        common.set_input(model, t)
+        model.invoke()
+
         return model
 
     def get_input_shape(self):
@@ -21,6 +28,7 @@ class CoralEngine(AbstractEngine):
     def __call__(self, input):
         if len(input.shape) > 3:
             input = input.squeeze()
+            assert len(input.shape) == 3
         
         if np.issubdtype(input.dtype, np.floating):
             input = 255 * input

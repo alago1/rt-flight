@@ -1,6 +1,8 @@
 import logging
 import traceback
 from typing import List
+from pprint import pprint
+import ntpath
 
 import exiftool
 import zmq
@@ -9,7 +11,7 @@ from server.layers.detector import DetectionLayer
 from server.layers.gps_translator import GPSTranslationLayer
 from server.layers.header_reader import HeaderReader
 from server.layers.parallel import ParallelLayer
-from server.models.bbox import BBox
+from server.models.bbox import BBox, BBoxes
 from server.models.error import DetectionError, HeaderError
 from server.models.header_metadata import HeaderMissingError
 from server.util.logging import setup_logger
@@ -17,11 +19,12 @@ from server.util.logging import setup_logger
 
 def GetBoundingBoxes(path: str) -> List[BBox]:
     try:
-        header_data, bboxes_pixels = parallel_layer.run((path,), share_input=True)
+        bboxes_pixels, header_data = parallel_layer.run((path,), share_input=True)
+        filename = ntpath.split(path)[1] or ntpath.basename(ntpath.split(path)[0])
 
         if len(bboxes_pixels) == 0:
             logging.info("No detections found")
-            return []
+            return BBoxes([], filename)
 
         output = gps_translation_layer.run(header_data, bboxes_pixels)
 
@@ -40,7 +43,7 @@ def GetBoundingBoxes(path: str) -> List[BBox]:
         logging.error(traceback.format_exc())
         raise e
 
-    return bbox_list
+    return BBoxes(bbox_list, filename)
 
 
 if __name__ == "__main__":
@@ -50,13 +53,15 @@ if __name__ == "__main__":
 
     setup_logger()
 
-    model_path = "yolo/yolov3-416.onnx"
-    # model_path = "yolo/yolov3-finetuned.onnx"
+    model_path = "yolo/yolov3-aerial.onnx"
+
+    kwargs = {'providers': [('CPUExecutionProvider')]} \
+        if model_path.endswith('.onnx') else {}
 
     parallel_layer = ParallelLayer([
-        DetectionLayer(model_path, engine="onnx", providers=[("CUDAExecutionProvider")], min_confidence=0.3),
         HeaderReader(),
-    ], thread_first=True)
+        DetectionLayer(model_path, engine="auto", **kwargs),
+    ], use_threads=True)
     gps_translation_layer = GPSTranslationLayer()
 
     try:
@@ -66,7 +71,6 @@ if __name__ == "__main__":
 
             try:
                 bboxes = GetBoundingBoxes(message.decode())
-                from pprint import pprint
                 pprint(bboxes)
                 socket.send_pyobj(bboxes)
             except HeaderMissingError as e:

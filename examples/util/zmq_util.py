@@ -27,8 +27,9 @@ def create_publisher(port, context, min_subscribers=1):
                 time.sleep(0.1)
             
             while True:
-                if not message_queue.empty():
-                    ui_publisher.send_json([asdict(r) for r in message_queue.get()])
+                # blocks and sends message as soon as it's available
+                results = message_queue.get()
+                ui_publisher.send_json(asdict(results))
         except KeyboardInterrupt:
             pass
         

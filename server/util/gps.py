@@ -17,7 +17,7 @@ def destination_point(start_lat, start_lon, bearing, distance):
         return destination_point.latitude, destination_point.longitude
 
 
-def pixel_to_gps(metadata: HeaderMetadata, pixel, backend="gdal"):
+def pixel_to_gps(metadata: HeaderMetadata, pixel, backend="geopy"):
     if backend not in ("geopy", "gdal"):
         raise NotImplementedError("Only geopy and gdal backends are supported")
     

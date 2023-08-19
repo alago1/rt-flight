@@ -11,7 +11,7 @@ from dataclasses import asdict
 import zmq
 
 import server.models.error as error
-from ..models.bbox import BBox
+from ..models.bbox import BBox, BBoxes
 
 
 connected_subs = 0
@@ -24,14 +24,16 @@ def main(img_path: str):
     model_socket = context.socket(zmq.REQ)
     model_socket.connect("tcp://localhost:5555")
 
+    s = time.perf_counter()
     model_socket.send_string(img_path)
     message = model_socket.recv()
+    e = time.perf_counter()
+    print(f"End-to-end: {1000*(e-s):.1f}ms")
 
     try:
         result = pickle.load(io.BytesIO(message))
 
-        if isinstance(result, list):
-            # result is a list of BBox objects
+        if isinstance(result, BBoxes):
             pprint(result)
         elif isinstance(result, error.DetectionError):
             print(f"Received Detection Error: {result.error_msg}")
@@ -65,8 +67,6 @@ def main(img_path: str):
                 ui_publisher.send(b'')
                 time.sleep(0.1)
             
-            print("Connected waiting 5 seconds")
-            time.sleep(5)
             print("Sending...")
             ui_publisher.send_json([asdict(r) for r in result])
         except KeyboardInterrupt:
@@ -122,10 +122,5 @@ def parse_image_path():
 
 
 if __name__ == "__main__":
-    # img_path = "../data/dota_demo.jpg"
-    # img_path = "../data/DJI_0007_copy.JPG"
-    # img_path = "../data_ignore/dji0007.out.tif"
-    # img_path = "../data/DJI_0007_copy.tif"
-
     img_path = parse_image_path()
     main(img_path)
