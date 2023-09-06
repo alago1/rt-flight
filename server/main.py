@@ -19,7 +19,7 @@ from server.util.logging import setup_logger
 
 def GetBoundingBoxes(path: str) -> List[BBox]:
     try:
-        bboxes_pixels, header_data = parallel_layer.run((path,), share_input=True)
+        header_data, bboxes_pixels = parallel_layer.run((path,), share_input=True)
         filename = ntpath.split(path)[1] or ntpath.basename(ntpath.split(path)[0])
 
         if len(bboxes_pixels) == 0:

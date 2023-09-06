@@ -4,8 +4,10 @@ gdal.UseExceptions()
 from rasterio.control import GroundControlPoint
 from rasterio.transform import GCPTransformer
 
+from typing import Tuple
 
-def pixel_to_wgs84(image_shape, pixel, corner_gps_coordinates):
+
+def pixel_to_wgs84(image_shape, pixel, corner_gps_coordinates) -> Tuple[float, float]:
     """
     Converts pixel location in image to GPS coordinates in wgs84.
 

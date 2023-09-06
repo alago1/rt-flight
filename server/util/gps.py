@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
 import geopy
 import geopy.distance
@@ -10,7 +10,7 @@ import numpy as np
 if TYPE_CHECKING:
     from models.header_metadata import HeaderMetadata
 
-def destination_point(start_lat, start_lon, bearing, distance):
+def destination_point(start_lat, start_lon, bearing, distance) -> Tuple[float, float]:
         start_point = geopy.Point(start_lat, start_lon)
         distance = geopy.distance.distance(meters=distance)
         destination_point = distance.destination(point=start_point, bearing=bearing)
@@ -59,14 +59,14 @@ def pixel_to_gps(metadata: HeaderMetadata, pixel, backend="geopy"):
     )
 
 
-def bbox_pixels_to_center_gps(metadata: HeaderMetadata, bbox_pixels):
+def bbox_pixels_to_center_gps(metadata: HeaderMetadata, bbox_pixels, **kwargs):
     x_min, x_max, y_min, y_max = bbox_pixels  # x: cols, y: rows
 
     bbox_center = (y_min + y_max) / 2, (x_min + x_max) / 2
-    return pixel_to_gps(metadata, bbox_center)
+    return pixel_to_gps(metadata, bbox_center, **kwargs)
 
 
-def get_radius_of_bbox_in_meters(metadata: HeaderMetadata, bbox_pixels):
+def get_radius_of_bbox_in_meters(metadata: HeaderMetadata, bbox_pixels) -> float:
     x_min, x_max, y_min, y_max = bbox_pixels  # x: cols, y: rows
     semiaxis_length_pixels = (y_max - y_min) / 2, (x_max - x_min) / 2
 
@@ -84,7 +84,7 @@ def get_radius_of_bbox_in_meters(metadata: HeaderMetadata, bbox_pixels):
     return np.sqrt(semiaxis_length_meters[0] ** 2 + semiaxis_length_meters[1] ** 2)
 
 
-def bbox_gps_center_and_radius_in_meters(metadata: HeaderMetadata, bbox_pixels):
+def bbox_gps_center_and_radius_in_meters(metadata: HeaderMetadata, bbox_pixels, **kwargs):
     """
     Returns the center of the bbox in gps coordinates (lat, lon) and the radius of the bbox in meters
 
@@ -92,7 +92,7 @@ def bbox_gps_center_and_radius_in_meters(metadata: HeaderMetadata, bbox_pixels):
     bbox_pixels: (x_min, x_max, y_min, y_max) in pixels where x: cols, y: rows
     """
 
-    center = bbox_pixels_to_center_gps(metadata, bbox_pixels)
+    center = bbox_pixels_to_center_gps(metadata, bbox_pixels, **kwargs)
     radius = get_radius_of_bbox_in_meters(metadata, bbox_pixels)
     logging.debug(f"Detection for center: {center}, radius: {radius}")
     return center[0], center[1], radius

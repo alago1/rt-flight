@@ -16,8 +16,8 @@ map.attributionControl.setPosition("bottomleft");
 map.fitWorld();
 
 // DBSCAN clustering setup
-const dbscan = dbscan_clustering(3, 0); // min 3pts per cluster, 10m radius
-// const dbscan = hdbscan_clustering(3);
+const dbscan = dbscan_clustering(2, 20); // min 3pts per cluster, 10m radius
+// const dbscan = hdbscan_clustering(2);
 
 // UI
 function markerPopup(layer) {

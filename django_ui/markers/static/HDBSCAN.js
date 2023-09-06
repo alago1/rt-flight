@@ -27,7 +27,7 @@ class HDBSCAN {
   
               def hdbscan_cluster(X):
                 X = np.array(X)
-                hdb = HDBSCAN(min_cluster_size=${minPts}, metric='haversine', cluster_selection_method='leaf')
+                hdb = HDBSCAN(min_cluster_size=${minPts}, metric='haversine', n_jobs=-1, cluster_selection_epsilon=3e-6)
                 return hdb.fit_predict(X)`
       );
     });

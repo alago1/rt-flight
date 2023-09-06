@@ -13,3 +13,4 @@ class BBox:
 @dataclass
 class BBoxes:
     bboxes: List[BBox]
+    filename: str
