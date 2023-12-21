@@ -9,6 +9,7 @@
 - [Tyler J. Schultz](https://github.com/tj-schultz)
 
 ## General File Structure
+
 ```
 root/
 ├── data/  # Data for the simulator
@@ -42,7 +43,8 @@ root/
 ```
 
 ## Setup before using
-You may want add to the `/data` folder at the root with the appropriate images. The mocked simulation makes use of the Blore_Clean geotiff image which can be found [here](https://drive.google.com/file/d/14mJcI-_crVwy95-pAr1K8nYJDyK99zh5/view?usp=share_link). Additionally, we make the use of [YoloV3 Darknet](https://github.com/jekhor/darknet) fine-tuned to aerial imagery as the detection model by default.
+
+You may want to add new images to the `data/` folder. The mocked simulation makes use of the Blore_Clean geotiff image which can be found [here](https://drive.google.com/file/d/14mJcI-_crVwy95-pAr1K8nYJDyK99zh5/view?usp=share_link). You can also find the sequential image data (with exif metadata) [here](https://drive.google.com/file/d/1lOAdMvF40pLJ9tO97fJLUsY6I-lxEM43/view?usp=sharing). It can be used to run the 'sequential_dataset.py' example. Additionally, we make the use of [YoloV3 Darknet](https://github.com/jekhor/darknet) fine-tuned to aerial imagery as the detection model by default.
 
 For this project we do not support the darknet model directly. You can find a keras h5 file converted from the darknet model [here](https://drive.google.com/file/d/1BlBvoZ2tIgFhMUnHYLhZB6-nmU6WrSHB/view?usp=sharing). We provide detailed instructions of how to convert from keras to tflite, edge-tpu, and onnx on `yolo/keras2tflite.ipynb` and `yolo/keras2onnx.ipynb`. Other formats, such as tensorrt, can be converted to from onnx.
 
@@ -66,6 +68,7 @@ This [sample](https://github.com/NVIDIA/TensorRT/blob/main/samples/python/yolov3
 Tested on: Ubuntu 22.04, Python 3.10
 
 We recommend using a virtual environment to install the dependencies.
+
 ```bash
 cd rt-flight/server
 python3 -m venv venv
@@ -73,6 +76,7 @@ source venv/bin/activate
 ```
 
 By default, we use GDAL to compute the gps coordinates but we also support a Geopy backend if you don't want to install that dependency on the server-side (client-side still needs it).
+
 ```bash
 # install GDAL (optional on server-side)
 apt install gdal-bin
@@ -89,6 +93,7 @@ apt install libimage-exiftool-perl
 # inside rt-flight/server
 pip install -r 'requirements.txt'
 ```
+
 In addition to the above dependencies, you must install a backend for running the detection model. The supported backends are `tflite`, `onnx`, `coral`, and `tensorrt`. Follow the instructions for the backend you want to use below.
 
 <details>
@@ -99,6 +104,7 @@ TensorFlow Lite
 ```bash
 pip install tflite_runtime
 ```
+
 </details>
 <details>
 <summary>
@@ -108,6 +114,7 @@ Onnx GPU Runtime
 ```bash
 pip install onnruntime_gpu
 ```
+
 </details>
 
 <details>
@@ -131,9 +138,11 @@ TensorRT
 </summary>
 
 Varies from system to system. Please follow the instructions [here](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html).
+
 </details>
 
 ### **Client-side (Ground Station)**
+
 The client-side (`django_ui/`) is a GeoDjango application that requires additional dependencies. We recommend following the [GeoDjango installation guide](https://docs.djangoproject.com/en/3.2/ref/contrib/gis/install/#installing-geodjango) first. We've tested with the SpatialLite database.
 
 ```bash
@@ -150,15 +159,13 @@ python manage.py shell -c "import django;django.db.connection.cursor().execute('
 python manage.py migrate
 ```
 
-***
-
+---
 
 ## Running the code
 
 Running the simulation requires running multiple programs. For single image files we use the `file_sender` script acts as an intermediary that emulates the transmission of a detection to the Ground Station and to the UI. We can also run a simulation of a flying uav with the `mocked_realtime_uav` script instead.
 
 Run each of the following in a separate terminal.
-
 
 ### **Start the backend**
 
