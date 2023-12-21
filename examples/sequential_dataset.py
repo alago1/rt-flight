@@ -32,7 +32,7 @@ SYNC_PORT = 5557
 start_server(context, min_subs=1, publisher_port=PUBLISHER_PORT, sync_port=SYNC_PORT)
 
 
-images_folder = project_path / "data_ignore" / "sequential_with_exif"
+images_folder = project_path / "data" / "sequential_with_exif"
 images = [images_folder / img for img in os.listdir(str(images_folder)) if img.lower().endswith(".jpg")]
 images.sort(key=lambda x: int(str(x)[-8:-4]))  # hack to sort by image number
 

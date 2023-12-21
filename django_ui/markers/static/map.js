@@ -21,19 +21,21 @@ const dbscan = dbscan_clustering(2, 20); // min 3pts per cluster, 10m radius
 
 // UI
 function markerPopup(layer) {
+  const id = layer.feature.id;
+  const name = layer.feature.properties.name;
+  const latitude = layer.feature.geometry.coordinates[1].toFixed(4);
+  const longitude = layer.feature.geometry.coordinates[0].toFixed(4);
+  const confidence = layer.feature.properties.confidence;
+  const radius = layer.feature.properties.radius.toFixed(2);
+  const cluster = layer.feature.properties.cluster;
+
   return `
         <div class="marker-popup">
-            <span>ID ${layer.feature.id}: ${
-    layer.feature.properties.name
-  }</span>
-            <span>Coordinates: ${layer.feature.geometry.coordinates[1].toFixed(
-              4
-            )}, ${layer.feature.geometry.coordinates[0].toFixed(4)}</span>
-            <span>Confidence: ${layer.feature.properties.confidence}%</span>
-            <span>Radius: ${layer.feature.properties.radius.toFixed(
-              2
-            )} meters</span>
-            <span>Cluster: ${layer.feature.properties.cluster}</span>
+            <span>ID ${id}: ${name}</span>
+            <span>Coordinates: ${latitude}, ${longitude}</span>
+            <span>Confidence: ${confidence}%</span>
+            <span>Radius: ${radius} meters</span>
+            <span>Cluster: ${cluster}</span>
         <div>
         `;
 }
