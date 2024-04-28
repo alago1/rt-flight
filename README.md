@@ -44,7 +44,7 @@ root/
 
 ## Setup before using
 
-You may want to add new images to the `data/` folder. The mocked simulation makes use of the Blore_Clean geotiff image which can be found [here](https://drive.google.com/file/d/14mJcI-_crVwy95-pAr1K8nYJDyK99zh5/view?usp=share_link). You can also find the sequential image data (with exif metadata) [here](https://drive.google.com/file/d/1lOAdMvF40pLJ9tO97fJLUsY6I-lxEM43/view?usp=sharing). It can be used to run the 'sequential_dataset.py' example. Additionally, we make the use of [YoloV3 Darknet](https://github.com/jekhor/darknet) fine-tuned to aerial imagery as the detection model by default.
+You may want to add new images to the `data/` folder. The mocked simulation makes use of the Blore_Clean geotiff image which can be found [here](https://drive.google.com/file/d/1_EdDilrEKAX_WJgnPjyXAN751kO6PBq7/view?usp=sharing). You can also find the sequential image data (with exif metadata) [here](https://drive.google.com/file/d/1lOAdMvF40pLJ9tO97fJLUsY6I-lxEM43/view?usp=sharing). It can be used to run the 'sequential_dataset.py' example. Additionally, we make the use of [YoloV3 Darknet](https://github.com/jekhor/darknet) fine-tuned to aerial imagery as the detection model by default.
 
 For this project we do not support the darknet model directly. You can find a keras h5 file converted from the darknet model [here](https://drive.google.com/file/d/1BlBvoZ2tIgFhMUnHYLhZB6-nmU6WrSHB/view?usp=sharing). We provide detailed instructions of how to convert from keras to tflite, edge-tpu, and onnx on `yolo/keras2tflite.ipynb` and `yolo/keras2onnx.ipynb`. Other formats, such as tensorrt, can be converted to from onnx.
 
